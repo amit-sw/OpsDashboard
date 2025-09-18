@@ -1,3 +1,11 @@
 # Add project dependencies here
 streamlit
 dotenv
+pandas
+supabase
+Authlib
+
+google-api-python-client
+google-auth-httplib2
+google-auth-oauthlib
+

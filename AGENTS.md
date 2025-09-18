@@ -6,7 +6,7 @@ Work process
 * Keep the test code updated as we update the main code, with a single-click run.
 
 Code structure
-* Wherever possible, follow the design of the sample app in the sample_app folder, if one is available.
+* Wherever possible, follow the design of the corresponding code as in the sample_code folder, if one is available.
 * Define a core_utils.py file with all the core utilities.
 * Put the core python code in src directory and the test code in test directory. However, main app and requirements.txt should be in the home directory.
 * Create a separate doc directory for user-facing documentation.

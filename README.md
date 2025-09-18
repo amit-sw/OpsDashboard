@@ -8,3 +8,11 @@ Initial project scaffold for the OpsDashboard application. The repository curren
 - `doc/` for user-facing documentation.
 
 Update this document as features and dependencies are added.
+
+For deveelopers:
+1. python -m venv .venv
+2. source .venv/bin/activate
+3. pip install -r requirements.txt
+4. streamlit run app.py
+
+
