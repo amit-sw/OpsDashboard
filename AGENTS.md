@@ -8,7 +8,7 @@ Work process
 Code structure
 * Wherever possible, follow the design of the corresponding code as in the sample_code folder, if one is available.
 * Define a core_utils.py file with all the core utilities.
-* Put the core python code in src directory and the test code in test directory. However, main app and requirements.txt should be in the home directory.
+* Put the core python code in src directory and the test code in test directory. However, main app.py and test_app.py along with requirements.txt should be in the home directory.
 * Create a separate doc directory for user-facing documentation.
 
 Code style
