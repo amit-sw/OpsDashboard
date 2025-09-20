@@ -7,6 +7,9 @@ Initial project scaffold for the OpsDashboard application. The repository curren
 - `test/` for automated tests.
 - `doc/` for user-facing documentation.
 
+Some key files:
+- `utils/calendar_integration.py` exposes `CalendarClient` for Google Calendar access.
+
 Update this document as features and dependencies are added.
 
 For deveelopers:
@@ -14,5 +17,4 @@ For deveelopers:
 2. source .venv/bin/activate
 3. pip install -r requirements.txt
 4. streamlit run app.py
-
 
