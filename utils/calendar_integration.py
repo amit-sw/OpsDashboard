@@ -1,3 +1,5 @@
+import streamlit as st
+
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from datetime import datetime, timezone, timedelta
@@ -35,6 +37,11 @@ class CalendarClient:
     def get_events_for_emails(self, emails):
         try:
             all_events = self.get_calendar_events(future_only=True, max_days=30)
+            #print(f"DEBUG. CalendarIntegration.GetEventsForEmails. {len(all_events)=}")
+            #print(f"DEBUG. CalendarIntegration.GetEventsForEmails. first event is {all_events[0]}")
+            #with st.expander("all_events in CalendarIntegration.GetEventsForEmails."):
+            #    st.dataframe(all_events)
+            #    st.json(all_events)
             lower_emails = [email.lower() for email in emails if email]
             if not lower_emails:
                 return {}
@@ -47,6 +54,8 @@ class CalendarClient:
                 for i, email in enumerate(emails):
                     if email and lower_emails[i] in attendee_emails:
                         email_events[email].append(event)
+            #with st.expander("email_events in CalendarIntegration.GetEventsForEmails."):
+            #    st.dataframe(email_events)
             return email_events
         except Exception as e:
             print(f"Error fetching events for emails: {e}")

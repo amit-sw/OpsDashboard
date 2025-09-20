@@ -2,6 +2,7 @@
 .venv
 .streamlit/secrets.toml
 *.json
+*.csv
 __pycache__/
 *.pyc
 *.pyo

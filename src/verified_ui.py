@@ -6,8 +6,7 @@ st.set_page_config(layout="wide")
 from utils.supabase_integration import SupabaseClient
 import pandas as pd
 
-def show_students_page():
-    st.title("Students page")
+from src.show_students_page import show_students_page
     
 def show_events_all():
     st.title("Events all page")

@@ -12,6 +12,9 @@ Some key files:
 
 Update this document as features and dependencies are added.
 
+For DB managers:
+1. Remember to add specific schema to Project->Settings->API to "Exposed Schemas" list
+
 For deveelopers:
 1. python -m venv .venv
 2. source .venv/bin/activate
