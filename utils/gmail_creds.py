@@ -69,6 +69,31 @@ class TokenStore:
             self.path.unlink()
 
 
+class SupabaseTokenStore:
+    def __init__(self, supabase_client) -> None:
+        self.client = supabase_client
+
+    def load(self) -> Optional[Dict[str, str]]:
+        record = self.client.get_token_from_db()
+        if not record:
+            return None
+        token_data = record.get('token')
+        if isinstance(token_data, dict):
+            return token_data
+        if isinstance(token_data, str):
+            try:
+                return json.loads(token_data)
+            except Exception:
+                return None
+        return None
+
+    def save(self, data: Dict[str, str]) -> None:
+        self.client.set_token_in_db(data)
+
+    def clear(self) -> None:
+        self.client.set_token_in_db(None)
+
+
 def pkce_pair() -> Tuple[str, str]:
     verifier = base64.urlsafe_b64encode(os.urandom(32)).decode("utf-8").rstrip("=")
     digest = hashlib.sha256(verifier.encode("utf-8")).digest()
@@ -202,11 +227,14 @@ class GmailOAuthManager:
         formatted = self._format_token(token)
         print(f"DEBUG: formatted token keys={list(formatted.keys())}")
         self.store.save(formatted)
-        if not self.store.path.exists():
-            st.error(f"Token file did not appear at {self.store.path.resolve()}")
-            print("DEBUG: token file missing after save()")
-            return
-        st.success(f"Saved token file → {self.store.path.resolve()}")
+        if hasattr(self.store, "path"):
+            if not self.store.path.exists():
+                st.error(f"Token file did not appear at {self.store.path.resolve()}")
+                print("DEBUG: token file missing after save()")
+                return
+            st.success(f"Saved token file → {self.store.path.resolve()}")
+        else:
+            st.success("Saved token to secure store.")
         self._tokens = formatted
         self._creds = self._creds_from_tokens(formatted)
 

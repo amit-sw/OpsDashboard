@@ -24,14 +24,16 @@ def test_calendar_integration():
         st.dataframe(events)
         
 from pathlib import Path
-from utils.gmail_creds import GmailOAuthManager, TokenStore, OAuthSettings
+from utils.gmail_creds import GmailOAuthManager, TokenStore, OAuthSettings, SupabaseTokenStore
 TOKEN_FILE = (Path(__file__).parent / ".tokens" / "gmail.json")
 
 
 
 def test_gmail_credentials() -> None:
     st.set_page_config(page_title="Gmail Search", layout="wide")
-    manager = GmailOAuthManager(OAuthSettings.from_secrets(), TokenStore(TOKEN_FILE))
+    supabase = SupabaseClient(url=os.environ.get("SUPABASE_URL", ""), key=os.environ.get('SUPABASE_KEY', ""))
+    store = SupabaseTokenStore(supabase) if supabase else TokenStore(TOKEN_FILE)
+    manager = GmailOAuthManager(OAuthSettings.from_secrets(), store)
 
     # Read query parameters in a way that works across Streamlit versions
     if hasattr(st, "query_params"):
@@ -70,8 +72,11 @@ def test_gmail_credentials() -> None:
             st.success("Authorization removed.")
             st.rerun()
     st.success("Authorization active. Refresh tokens will be managed automatically.")
-    st.caption(f"Token file path: {TOKEN_FILE.resolve()}")
-    st.caption(f"Token file exists: {TOKEN_FILE.exists()}")
+    if isinstance(store, TokenStore):
+        st.caption(f"Token file path: {TOKEN_FILE.resolve()}")
+        st.caption(f"Token file exists: {TOKEN_FILE.exists()}")
+    else:
+        st.caption("Tokens stored in Supabase.")
 
 if __name__ == "__main__":
     env_secrets=st.secrets.get("env")  

@@ -82,6 +82,8 @@ class SupabaseClient:
         """Stores a new token row while marking previous tokens inactive."""
         try:
             self.supabase.table('gm_tokens').update({'status': 'inactive'}).neq('status', 'inactive').execute()
+            if params is None:
+                return None
             response = self.supabase.table('gm_tokens').insert({'token': params, 'status': 'active'}).execute()
             if response.data:
                 return response.data[0]
