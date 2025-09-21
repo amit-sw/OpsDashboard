@@ -43,6 +43,21 @@ def show_ui_core(user):
     pg = st.navigation(pages, position="top")
     pg.run()
     
+def show_ui_superadmin(user):
+    show_sidebar_ui(user)
+    #st.title("Admin Panel")
+    #st.write("This is the admin panel. More features coming soon!")
+    pages = {
+        "Super-Students": [
+            st.Page(show_students_page, title="Students"),
+        ],
+        "Super-Calendar": [
+            st.Page(show_events_all, title="Calendar"),
+        ],
+    }
+    pg = st.navigation(pages, position="top")
+    pg.run()
+    
 def show_ui_admin(user):
     #st.title("Admin Panel")
     #st.write("This is the admin panel. More features coming soon!")
@@ -70,7 +85,9 @@ def show_ui(user):
                 show_ui_guest(user)
                 return
             role= user_record.get("role", "guest")
-            if role == "admin":
+            if role == "superadmin":
+                show_ui_superadmin(user)
+            elif role == "admin":
                 show_ui_admin(user)
             elif role == "user":
                 show_ui_user(user)
