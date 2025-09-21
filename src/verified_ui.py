@@ -7,6 +7,7 @@ from utils.supabase_integration import SupabaseClient
 import pandas as pd
 
 from src.show_students_page import show_students_page
+from src.show_gmail_creds_page import show_gmail_creds_page
     
 def show_events_all():
     st.title("Events all page")
@@ -48,8 +49,8 @@ def show_ui_superadmin(user):
     #st.title("Admin Panel")
     #st.write("This is the admin panel. More features coming soon!")
     pages = {
-        "Super-Students": [
-            st.Page(show_students_page, title="Students"),
+        "SuperAdmin": [
+            st.Page(show_gmail_creds_page, title="GMail Creds"),
         ],
         "Super-Calendar": [
             st.Page(show_events_all, title="Calendar"),
