@@ -9,6 +9,7 @@ Initial project scaffold for the OpsDashboard application. The repository curren
 
 Some key files:
 - `utils/calendar_integration.py` exposes `CalendarClient` for Google Calendar access.
+- `helpers/test_creds2.py` provides a prototype Gmail read-only OAuth + search utility.
 
 Update this document as features and dependencies are added.
 
@@ -20,4 +21,3 @@ For deveelopers:
 2. source .venv/bin/activate
 3. pip install -r requirements.txt
 4. streamlit run app.py
-

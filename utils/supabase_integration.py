@@ -68,12 +68,24 @@ class SupabaseClient:
             return None
 
     def get_token_from_db(self):
-        """Fetches token details from the 'gm_tokens' table based on email."""
+        """Fetches the first Google Meet token marked as active."""
         try:
-            response = self.supabase.table('gm_tokens').select('*').execute()
+            response = self.supabase.table('gm_tokens').select('*').eq('status', 'active').execute()
             if response.data:
                 return response.data[0]
             return None
         except Exception as e:
             print(f"Error fetching user from database: {e}")
+            return None
+
+    def set_token_in_db(self, params):
+        """Stores a new token row while marking previous tokens inactive."""
+        try:
+            self.supabase.table('gm_tokens').update({'status': 'inactive'}).neq('status', 'inactive').execute()
+            response = self.supabase.table('gm_tokens').insert({'token': params, 'status': 'active'}).execute()
+            if response.data:
+                return response.data[0]
+            return None
+        except Exception as e:
+            print(f"Error storing token in database: {e}")
             return None

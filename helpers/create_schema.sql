@@ -75,7 +75,9 @@ alter table opsdashboard.calendar_events
 create table if not exists opsdashboard.gm_tokens (
   id           bigint not null primary key,
   created_at   timestamptz not null default now(),
-  token        jsonb
+  token        jsonb,
+  status       text not null default 'active',
+  updated_at   timestamptz not null default now()
 );
 
 create sequence if not exists opsdashboard.gm_tokens_id_seq
