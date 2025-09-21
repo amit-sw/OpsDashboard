@@ -7,7 +7,9 @@ from utils.supabase_integration import SupabaseClient
 import pandas as pd
 
 from src.show_students_page import show_students_page
+from src.show_student_email_calendar import show_student_email_calendar
 from src.show_gmail_creds_page import show_gmail_creds_page
+from src.show_search_page import show_search_page
     
 def show_events_all():
     st.title("Events all page")
@@ -37,8 +39,12 @@ def show_ui_core(user):
             st.Page(show_students_page, title="Students"),
         ],
         "Calendar": [
-            st.Page(show_events_all, title="Calendar"),
+            st.Page(show_student_email_calendar, title="Calendar"),
         ],
+        "Search": [
+            st.Page(show_search_page, title="Email search"),
+        ],
+
     }
 
     pg = st.navigation(pages, position="top")
@@ -53,7 +59,10 @@ def show_ui_superadmin(user):
             st.Page(show_gmail_creds_page, title="GMail Creds"),
         ],
         "Super-Calendar": [
-            st.Page(show_events_all, title="Calendar"),
+            st.Page(show_student_email_calendar, title="Calendar"),
+        ],
+        "Super-Search": [
+            st.Page(show_search_page, title="Email search"),
         ],
     }
     pg = st.navigation(pages, position="top")

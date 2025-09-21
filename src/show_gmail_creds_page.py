@@ -21,8 +21,8 @@ def set_gmail_credentials() -> None:
 
     # Normalize: convert list values (from experimental API) to single strings
     params = {k: (v if isinstance(v, str) else (v[0] if v else "")) for k, v in raw_params.items()}
-    print(f"DEBUG: {params=}")
-    print(f"DEBUG: token_path={TOKEN_FILE.resolve()}")
+    #print(f"DEBUG: {params=}")
+    #print(f"DEBUG: token_path={TOKEN_FILE.resolve()}")
 
     if "code" in params and "state" in params:
         manager.exchange_code(params)

@@ -11,7 +11,7 @@ class CalendarClient:
             creds = service_account.Credentials.from_service_account_info(credentials)
             self.service = build('calendar', 'v3', credentials=creds)
         except Exception as e:
-            print(f"Error creating Google Calendar service: {e}")
+            print(f"Error creating Google Calendar service: {e}; {credentials=}")
 
     def get_calendar_events(self, future_only=True, max_days=30):
         try:

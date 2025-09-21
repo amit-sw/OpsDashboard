@@ -139,7 +139,7 @@ class GmailOAuthManager:
         self._pending = PendingAuthStore(PENDING_DIR)
         # If we have a client_secret (confidential client), prefer no-PKCE; otherwise use PKCE
         self._use_pkce = not bool(self.settings.client_secret)
-        print(f"DEBUG: use_pkce={self._use_pkce}")
+        #print(f"DEBUG: use_pkce={self._use_pkce}")
 
     def _creds_from_tokens(self, tokens: Optional[Dict[str, str]]) -> Optional[Credentials]:
         if not tokens:

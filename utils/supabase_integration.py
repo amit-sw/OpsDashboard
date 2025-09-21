@@ -7,7 +7,7 @@ class SupabaseClient:
         try:
             self.supabase: Client = create_client(url, key)
         except Exception as e:
-            print(f"ERROR. Error connecting to Supabase: {e}")
+            print(f"ERROR. Error connecting to Supabase: {e}. You provided {url=}, {key=}")
             self.supabase = None
 
     def get_calendar_events_from_db(self):
