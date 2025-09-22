@@ -96,7 +96,9 @@ create table if not exists opsdashboard.research_program_students (
   student_emails          json not null,
   parent_emails           json,
   primary_student_email   text,
-  primary_parent_email    text
+  primary_parent_email    text,
+  instructor_id           number default 10000,
+  mentor_id               number default 10000
 );
 
 create sequence if not exists opsdashboard.research_program_students_id_seq
@@ -123,6 +125,23 @@ create sequence if not exists opsdashboard.student_emails_id_seq
 alter sequence opsdashboard.student_emails_id_seq owned by opsdashboard.student_emails.id;
 alter table opsdashboard.student_emails
   alter column id set default nextval('opsdashboard.student_emails_id_seq');
+
+-- =========================================================
+-- Instructors and mentors
+-- =========================================================
+create table if not exists opsdashboard.instructors (
+  id            bigint not null primary key,
+  name    varchar not null,
+  email     varchar not null,
+  created_at   timestamptz default now(),
+  updated_at   timestamptz default now()
+);
+
+create sequence if not exists opsdashboard.instructors_id_seq
+  start with 10000 increment by 1;
+alter sequence opsdashboard.instructors_id_seq owned by opsdashboard.instructors.id;
+alter table opsdashboard.instructors
+  alter column id set default nextval('opsdashboard.instructors_id_seq');
 
 -- =========================================================
 -- waitlist
@@ -171,6 +190,10 @@ grant select on public.student_emails to anon, authenticated;
 create or replace view public.waitlist as
   select * from opsdashboard.waitlist;
 grant select on public.waitlist to anon, authenticated;
+
+create or replace view public.instructors as
+  select * from opsdashboard.instructors;
+grant select on public.instructors to anon, authenticated;
 
 -- allow API roles to use the schema
 grant usage on schema opsdashboard to anon, authenticated, service_role;

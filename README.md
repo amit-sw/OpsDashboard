@@ -9,12 +9,18 @@ Initial project scaffold for the OpsDashboard application. The repository curren
 
 Some key files:
 - `utils/calendar_integration.py` exposes `CalendarClient` for Google Calendar access.
-- `helpers/test_creds2.py` provides a prototype Gmail read-only OAuth + search utility.
+- `utils/supabase_integration.py' exposes 'SupabaseClient' for database access.
 
 Update this document as features and dependencies are added.
 
 For DB managers:
 1. Remember to add specific schema to Project->Settings->API to "Exposed Schemas" list
+2. For all schema changes, please update helpders/create_schema.sql
+
+Entry points:
+* app.py: Main entry point
+* test_app.py: Used for testing sub-functionality in isolation during development
+* helpers/ : Code written for non-App use (e.g. loading specific tables)
 
 For deveelopers:
 1. python -m venv .venv

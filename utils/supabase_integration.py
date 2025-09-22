@@ -91,3 +91,46 @@ class SupabaseClient:
         except Exception as e:
             print(f"Error storing token in database: {e}")
             return None
+
+    def get_instructors(self):
+        try:
+            response = self.supabase.table('instructors').select('*').execute()
+            return response.data or []
+        except Exception as e:
+            print(f"Error fetching instructors: {e}")
+            return []
+
+    def create_instructor(self, instructor):
+        try:
+            response = self.supabase.table('instructors').insert(instructor).execute()
+            return response.data or []
+        except Exception as e:
+            print(f"Error creating instructor: {e}")
+            return []
+
+    def upsert_instructor(self, instructor):
+        try:
+            response = (
+                self.supabase
+                .table('instructors')
+                .upsert(instructor)
+                .execute()
+            )
+            return response.data or []
+        except Exception as e:
+            print(f"Error upserting instructor: {e}")
+            return []
+
+    def update_instructor(self, instructor_id, updates):
+        try:
+            response = (
+                self.supabase
+                .table('instructors')
+                .update(updates)
+                .eq('id', instructor_id)
+                .execute()
+            )
+            return response.data or []
+        except Exception as e:
+            print(f"Error updating instructor: {e}")
+            return []

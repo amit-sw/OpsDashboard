@@ -266,7 +266,7 @@ def search_ui(creds: Credentials) -> None:
         st.write(f"Showing {len(rows)} of ~{est} message(s).")
         if est > len(rows) and not fetch_all:
             st.info("Increase Max results or enable 'Fetch all'.")
-        st.dataframe(rows, use_container_width=True)
+        st.dataframe(rows, width='stretch')
         st.sidebar.caption(f"Last fetch took {duration}")
 
 

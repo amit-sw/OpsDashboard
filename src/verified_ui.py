@@ -10,6 +10,7 @@ from src.show_students_page import show_students_page
 from src.show_student_email_calendar import show_student_email_calendar
 from src.show_gmail_creds_page import show_gmail_creds_page
 from src.show_search_page import show_search_page
+from src.show_instructors_page import show_instructors_page
     
 def show_events_all():
     st.title("Events all page")
@@ -69,9 +70,24 @@ def show_ui_superadmin(user):
     pg.run()
     
 def show_ui_admin(user):
-    #st.title("Admin Panel")
-    #st.write("This is the admin panel. More features coming soon!")
-    show_ui_core(user)
+    show_sidebar_ui(user)
+    
+    pages = {
+        "Admin-Students": [
+            st.Page(show_students_page, title="Students"),
+        ],
+        "Admin-Calendar": [
+            st.Page(show_student_email_calendar, title="Calendar"),
+        ],
+        "Admin-Search": [
+            st.Page(show_search_page, title="Email search"),
+            st.Page(show_instructors_page, title="Instructors"),
+        ],
+
+    }
+
+    pg = st.navigation(pages, position="top")
+    pg.run()
 
 def show_ui_guest(user):
     st.title("Guest Access")

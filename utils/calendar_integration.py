@@ -28,7 +28,7 @@ class CalendarClient:
                 orderBy='startTime'
             ).execute()
             events = events_result.get('items', [])
-            print(f"Fetched {len(events)=} events from Google Calendar.")
+            #print(f"Fetched {len(events)=} events from Google Calendar.")
             return events
         except Exception as e:
             print(f"Error fetching calendar events: {e}")
