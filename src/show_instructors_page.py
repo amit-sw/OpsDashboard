@@ -5,6 +5,8 @@ import pandas as pd
 from utils.supabase_integration import SupabaseClient
 
 def add_instructor(name,email_address):
+    print(f"TO-DO: add_instructor. {name=},{email_address=}")
+    st.error(f"TO-DO: add_instructor. {name=},{email_address=}")
 
 def show_update_instructors():
     st.title("Instructors")
@@ -23,6 +25,7 @@ def show_update_instructors():
             st.session_state["data_editor_key"]["edited_rows"] = None
             
 def show_add_instructors():
+    st.write("Add instructor")
     name=st.text_input("Name")
     email_address=st.text_input("Email Address")
     if name and email_address and st.button("Add"):
