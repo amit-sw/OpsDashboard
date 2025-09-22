@@ -134,3 +134,9 @@ class SupabaseClient:
         except Exception as e:
             print(f"Error updating instructor: {e}")
             return []
+        
+    def update_instructors(self,row_id,column_name,new_value):
+        updates={column_name:new_value}
+        upd=self.update_instructor(row_id, updates)
+        return upd
+        
