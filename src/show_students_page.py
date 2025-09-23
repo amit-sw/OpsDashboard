@@ -382,7 +382,11 @@ def show_students_page():
                           if search_text in s["full_name"].lower() or 
                              (s["next_class"] and str(s["next_class"]).lower().startswith(search_text)) or
                              (s["date_time"] and search_text in s["date_time"].lower()) or
-                             (s["event_name"] and search_text in s["event_name"].lower())]
+                             (s["event_name"] and search_text in s["event_name"].lower()) or
+                             (s["instructor"] and search_text in s["instructor"].lower()) or
+                             (s["mentor"] and search_text in s["mentor"].lower()) or
+                             (s["ops"] and search_text in s["ops"].lower()) 
+                             ]
     else:
         filtered_students = processed_students
         
