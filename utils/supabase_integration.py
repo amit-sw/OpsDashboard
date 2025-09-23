@@ -22,7 +22,7 @@ class SupabaseClient:
     def get_students_from_db(self):
         """Gets student data from the 'research_program_students' table in Supabase."""
         try:
-            response = self.supabase.table('research_program_students').select('full_name, student_emails, parent_emails').execute()
+            response = self.supabase.table('research_program_students').select('full_name, student_emails, parent_emails,instuctor_name,mentor_name,ops_name').execute()
             return response.data
         except Exception as e:
             print(f"Error fetching students from database: {e}")

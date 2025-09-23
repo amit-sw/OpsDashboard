@@ -2,8 +2,5 @@
 .venv
 .streamlit/secrets.toml
 *.json
-*.csv
+*.py[cod]
 __pycache__/
-*.pyc
-*.pyo
-*.pyd

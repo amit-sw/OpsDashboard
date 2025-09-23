@@ -101,6 +101,10 @@ create table if not exists opsdashboard.research_program_students (
   mentor_id               number default 10000
 );
 
+ALTER TABLE opsdashboard.research_program_students ADD COLUMN instuctor_name text;
+ALTER TABLE opsdashboard.research_program_students ADD COLUMN mentor_name text;
+ALTER TABLE opsdashboard.research_program_students ADD COLUMN ops_name text;
+
 create sequence if not exists opsdashboard.research_program_students_id_seq
   start with 10000 increment by 1;
 alter sequence opsdashboard.research_program_students_id_seq owned by opsdashboard.research_program_students.id;
@@ -179,7 +183,7 @@ grant select on public.gm_tokens to anon, authenticated;
 
 create or replace view public.research_program_students as
   select * from opsdashboard.research_program_students;
-grant select on public.research_program_students to anon, authenticated;
+grant select,update on public.research_program_students to anon, authenticated;
 
 grant usage, select on sequence opsdashboard.research_program_students_id_seq to authenticated, anon;
 

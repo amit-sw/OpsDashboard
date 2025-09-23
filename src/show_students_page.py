@@ -354,7 +354,10 @@ def show_students_page():
                 "full_name": student.get("full_name", "Unknown"),
                 "next_class": calculate_days_until_event(closest_event),
                 "date_time": format_event_datetime(closest_event),
-                "event_name": get_event_title(closest_event)
+                "event_name": get_event_title(closest_event),
+                "instructor": student.get("instuctor_name", "Unknown instructor"),
+                "mentor": student.get("mentor_name", "Unknown mentor"),
+                "ops": student.get("ops_name", "Unknown ops"),
             })
     
     # Sort students by next_class, with None values at the end
@@ -366,6 +369,12 @@ def show_students_page():
     # Add a search box
     search_text = st.text_input("Search", key="student_search", placeholder="Search students...")
     search_text = search_text.lower() if search_text else ""
+
+    #with st.expander("Students"):
+    #    st.dataframe(students)
+    
+    #with st.expander("Processed students"):
+    #    st.dataframe(processed_students)
     
     # Filter students based on search text
     if search_text:
@@ -376,13 +385,19 @@ def show_students_page():
                              (s["event_name"] and search_text in s["event_name"].lower())]
     else:
         filtered_students = processed_students
+        
+    #with st.expander("FIltered students"):
+    #    st.dataframe(filtered_students)
     
     # Create columns for the header
-    col1, col2, col3, col4 = st.columns([3, 1, 2, 3])
+    col1, col2, col3, col4, col5, col6, col7 = st.columns([3, 1, 2, 3, 2, 2, 2])
     col1.markdown("**Student Name**")
     col2.markdown("**Next Class (Days)**")
     col3.markdown("**Date and Time**")
     col4.markdown("**Event Name**")
+    col5.markdown("**Instructor**")
+    col6.markdown("**Mentor**")
+    col7.markdown("**Ops**")
     
     # Add a divider for visual separation
     st.markdown("<hr style='margin: 5px 0; padding: 0'>", unsafe_allow_html=True)
@@ -390,7 +405,7 @@ def show_students_page():
     # Create a container for the scrollable list
     with st.container():
         for student in filtered_students:
-            cols = st.columns([3, 1, 2, 3])
+            cols = st.columns([3, 1, 2, 3, 2, 2, 2])
             
             # Make the student name a clickable link
             student_name = student["full_name"]
@@ -402,6 +417,9 @@ def show_students_page():
             cols[1].write(student["next_class"] if student["next_class"] is not None else "None")
             cols[2].write(student["date_time"])
             cols[3].write(student["event_name"])
+            cols[4].write(student["instructor"])
+            cols[5].write(student["mentor"])
+            cols[6].write(student["ops"])
             
             # Add subtle divider between rows
             st.markdown("<hr style='margin: 3px 0; padding: 0'>", unsafe_allow_html=True)
