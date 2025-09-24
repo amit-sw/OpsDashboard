@@ -163,6 +163,36 @@ alter table opsdashboard.waitlist
   alter column id set default nextval('opsdashboard.waitlist_id_seq');
 
 -- =========================================================
+-- confluence_pages
+-- (Converted PK to sequence-backed bigint)
+-- =========================================================
+create table if not exists opsdashboard.confluence_pages (
+  id                      bigint not null primary key,
+  full_name               text not null,
+  title                   text,
+  page_url                text,
+  created_at   timestamptz not null default now(),
+  updated_at   timestamptz not null default now()
+);
+
+create sequence if not exists opsdashboard.confluence_pages_id_seq
+  start with 10000 increment by 1;
+alter sequence opsdashboard.confluence_pages_id_seq owned by opsdashboard.confluence_pages.id;
+alter table opsdashboard.confluence_pages
+  alter column id set default nextval('opsdashboard.confluence_pages_id_seq');
+
+-- allow API roles to see the schema
+grant usage on schema opsdashboard to anon, authenticated;
+
+-- allow basic table privileges
+grant select, insert, update, delete on opsdashboard.confluence_pages
+  to anon, authenticated;
+
+-- if you will insert (uses the sequence)
+grant usage, select on sequence opsdashboard.confluence_pages_id_seq
+  to anon, authenticated;
+
+-- =========================================================
 -- Public views + grants
 -- =========================================================
 create or replace view public.authorized_users as
@@ -199,6 +229,32 @@ create or replace view public.instructors as
   select * from opsdashboard.instructors;
 grant select on public.instructors to anon, authenticated;
 
+-- 1. Create a simple pass-through view
+create or replace view public.confluence_pages as
+  select * from opsdashboard.confluence_pages;
+
+-- 2. Ensure it runs with caller’s rights
+alter view public.confluence_pages set (security_invoker = true);
+
+-- 3. Grant privileges on both the view and underlying schema/table
+grant usage on schema opsdashboard to anon, authenticated;
+grant select, update on opsdashboard.confluence_pages to anon, authenticated;
+grant select, update on public.confluence_pages to anon, authenticated;
+
+-- 4. Enable and add RLS policies on the base table
+alter table opsdashboard.confluence_pages enable row level security;
+
+create policy allow_select
+on opsdashboard.confluence_pages
+for select to authenticated
+using (true);
+
+create policy allow_update
+on opsdashboard.confluence_pages
+for update to authenticated
+using (true)
+with check (true);
+
 -- allow API roles to use the schema
 grant usage on schema opsdashboard to anon, authenticated, service_role;
 
@@ -213,3 +269,26 @@ alter default privileges for role postgres in schema opsdashboard
   grant all on tables to anon, authenticated, service_role;
 alter default privileges for role postgres in schema opsdashboard
   grant all on sequences to anon, authenticated, service_role;
+
+-- Function calls to avoid access issues
+create or replace function public.update_contact_by_full_name(
+  p_full_name text,
+  p_instructor text,
+  p_mentor text,
+  p_ops text
+)
+returns setof opsdashboard.research_program_students
+language sql
+security definer
+as $$
+  update opsdashboard.research_program_students
+     set instuctor_name  = p_instructor,
+         mentor_name  = p_mentor,
+         ops_name = p_ops
+   where full_name = p_full_name
+   returning *;
+$$;
+
+-- add a policy that allows calling this function if needed
+grant execute on function public.update_contact_by_full_name(text, text, text, text)
+  to authenticated;

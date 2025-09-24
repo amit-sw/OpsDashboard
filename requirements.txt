@@ -11,3 +11,5 @@ google-auth-oauthlib
 
 langchain-openai
 
+atlassian-python-api
+markdownify

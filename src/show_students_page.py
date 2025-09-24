@@ -394,7 +394,7 @@ def show_students_page():
     #    st.dataframe(filtered_students)
     
     # Create columns for the header
-    col1, col2, col3, col4, col5, col6, col7 = st.columns([3, 1, 2, 3, 2, 2, 2])
+    col1, col2, col3, col4, col5, col6, col7, col8 = st.columns([3, 1, 2, 3, 2, 2, 2, 3])
     col1.markdown("**Student Name**")
     col2.markdown("**Next Class (Days)**")
     col3.markdown("**Date and Time**")
@@ -402,6 +402,7 @@ def show_students_page():
     col5.markdown("**Instructor**")
     col6.markdown("**Mentor**")
     col7.markdown("**Ops**")
+    col8.markdown("**Confluence**")
     
     # Add a divider for visual separation
     st.markdown("<hr style='margin: 5px 0; padding: 0'>", unsafe_allow_html=True)
@@ -409,7 +410,7 @@ def show_students_page():
     # Create a container for the scrollable list
     with st.container():
         for student in filtered_students:
-            cols = st.columns([3, 1, 2, 3, 2, 2, 2])
+            cols = st.columns([3, 1, 2, 3, 2, 2, 2, 3])
             
             # Make the student name a clickable link
             student_name = student["full_name"]
@@ -424,6 +425,15 @@ def show_students_page():
             cols[4].write(student["instructor"])
             cols[5].write(student["mentor"])
             cols[6].write(student["ops"])
+            with cols[7]:
+                page_list=supabase.get_confluence_pages(student_name)
+                if page_list:
+                    for page in page_list:
+                        title=page.get('title', 'No title')
+                        page_url=page.get('page_url', 'https://aiclub.world')
+                        st.link_button(title,page_url)
+                    
+                
             
             # Add subtle divider between rows
             st.markdown("<hr style='margin: 3px 0; padding: 0'>", unsafe_allow_html=True)

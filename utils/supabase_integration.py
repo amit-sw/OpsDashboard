@@ -140,3 +140,13 @@ class SupabaseClient:
         upd=self.update_instructor(row_id, updates)
         return upd
         
+    def get_confluence_pages(self, full_name):
+        """Fetches user details from the 'users' table based on email."""
+        try:
+            response = self.supabase.table('confluence_pages').select('*').eq('full_name', full_name).execute()
+            if response.data:
+                return response.data
+            return None
+        except Exception as e:
+            print(f"Error fetching user from database: {e}")
+            return None

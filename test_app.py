@@ -77,6 +77,17 @@ def test_gmail_credentials() -> None:
         st.caption(f"Token file exists: {TOKEN_FILE.exists()}")
     else:
         st.caption("Tokens stored in Supabase.")
+        
+def test_confluence_links():
+    full_name=st.text_input("Student name")
+    supabase = SupabaseClient(url=os.environ["SUPABASE_URL"], key=os.environ['SUPABASE_KEY'])
+    responses = supabase.get_confluence_pages(full_name)
+    for resp in responses:
+        title=resp.get('title', 'No title')
+        page_url=resp.get('page_url', 'https://aiclub.world')
+        st.write(f"{resp=}")
+        st.link_button(title,page_url)
+    
 
 if __name__ == "__main__":
     env_secrets=st.secrets.get("env")  
@@ -85,4 +96,5 @@ if __name__ == "__main__":
     #test_st_secrets()
     #test_supabase_integration()
     #test_calendar_integration()
-    test_gmail_credentials()
+    #test_gmail_credentials()
+    test_confluence_links()
