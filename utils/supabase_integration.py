@@ -150,3 +150,28 @@ class SupabaseClient:
         except Exception as e:
             print(f"Error fetching user from database: {e}")
             return None
+        
+    def insert_gmail_index_records(self, rows):
+        try:
+            response = self.supabase.table("gmail_message_index").insert(rows).execute()
+            return response.data or []
+        except Exception as e:
+            print(f"Error creating instructor: {e}")
+            return []
+        
+    def insert_messages_batch(self,rows):
+        # rows: [{id, thread_id, internal_ms, headers, snippet, body_full, raw_json}]
+        if not rows:
+            return
+        response=self.supabase.table("gmail_messages").insert(rows).execute()
+        return response
+
+    def get_ids(self,ymd: str, fetch_bodies: bool = True):
+        """
+        ymd: 'YYYY-MM-DD' (UTC)
+        Fetch IDs from gmail_message_index for that date, hydrate with Gmail API, and upsert into gmail_messages.
+        """
+        # 1) get IDs for that day
+        response = self.supabase.table("gmail_message_index").select("id, thread_id, internal_ms").eq("ymd", ymd).order("internal_ms", desc=False).execute()
+        ids=response.data or []
+        return ids

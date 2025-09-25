@@ -11,6 +11,7 @@ from src.show_student_email_calendar import show_student_email_calendar
 from src.show_gmail_creds_page import show_gmail_creds_page
 from src.show_search_page import show_search_page
 from src.show_instructors_page import show_instructors_page
+from src.show_gmail_fetch_control import show_gmail_fetch_control
     
 def show_events_all():
     st.title("Events all page")
@@ -81,7 +82,8 @@ def show_ui_admin(user):
         ],
         "Admin-Search": [
             st.Page(show_search_page, title="Email search"),
-            st.Page(show_instructors_page, title="Instructors"),
+            #st.Page(show_instructors_page, title="Instructors"),
+            st.Page(show_gmail_fetch_control, title="GMail Fetch"),
         ],
 
     }
