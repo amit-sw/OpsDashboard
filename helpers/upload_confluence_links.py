@@ -70,7 +70,7 @@ def main_run():
                 for result in results.get("results",[]):
                     try:
                         title=result['content'].get('title')
-                        if title=='Students' or title == 'How did they find us?':
+                        if title=='Students' or title == 'How did they find us?' or title == 'Potential Projects':
                             continue
                         webui_link=result["content"]["_links"].get('webui')
                         url=URL_BASE+webui_link
