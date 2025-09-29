@@ -13,3 +13,4 @@ langchain-openai
 
 atlassian-python-api
 markdownify
+posthog
