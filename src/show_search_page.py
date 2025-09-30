@@ -110,7 +110,10 @@ def fetch_metadata_and_body(service, msg_id: str) -> Dict[str, str]:
         "body": body,
     }
 
-def get_summary(records):
+def get_summary(records, supress=True):
+    if supress:
+        return "Summary supressed at this time"
+    
     CONTEXT_LIMIT=20000 #Number of characters to put in any message,
     PROMPT="""
     You are a Customer Relationship expert. Given the following communication between a student/their parents and service coordinators,
@@ -142,6 +145,30 @@ def gmail_search(creds: Credentials, query: str, limit: int, fetch_all: bool = F
         return ([fetch_metadata_and_body(svc, i) for i in ids], est)
     except HttpError as e:
         raise RuntimeError(f"Gmail API error: {e}")
+    
+def show_row(idx,r):
+    #st.write(f"For {idx=}, we see {r=}")
+    fromm = r.get('from')
+    to = r.get('to')
+    date = r.get('date')
+    subject=r.get('subject')
+    body=r.get('body')
+    st.write(f"## Email {idx+1}")
+    st.write(f"From: {fromm}")
+    st.write(f"To: {to}")
+    st.write(f"Date: {date}")
+    st.write(f"Subject: {subject}")
+    st.text(f"{body}")
+    
+    
+    
+def show_messages_in_ui(rows,max_rows=10):
+    if rows:
+        new_rows=rows[:max_rows]
+        with st.expander(f"Detailed emails: {len(new_rows)}"):
+            for idx,r in enumerate(new_rows):
+                show_row(idx,r)
+                st.divider()
 
 def search_ui(creds: Credentials, query_term=None) -> None:
     search_expression = " in:all newer_than:90d"
@@ -165,18 +192,24 @@ def search_ui(creds: Credentials, query_term=None) -> None:
             st.info("No messages found.")
             st.caption(f"Completed in {duration}")
             return
-        placeholder=st.empty()
+        placeholder1=st.empty()
+        placeholder2=st.empty()
         st.write(f"Showing {len(rows)} of ~{est} message(s).")
         if est > len(rows) and not fetch_all:
             st.info("Increase Max results or enable 'Fetch all'.")
         st.dataframe(rows, width='stretch')
         st.sidebar.caption(f"Last fetch took {duration}")
+        st.divider()
+        show_messages_in_ui(rows)
         start = time.perf_counter()
-        with st.spinner("Asking LLM…", show_time=True):
-            summary=get_summary(rows)
+        with placeholder1:
+            with st.spinner("Summarizing with LLM…", show_time=True): 
+                summary=get_summary(rows, supress=False)
+        with placeholder2:
+            with st.expander("Summary"):
+                st.write(summary)
         elapsed = time.perf_counter() - start
         duration = f"{elapsed*1000:.0f} ms" if elapsed < 1 else f"{elapsed:.2f} s"
-        placeholder.write(summary)
         st.sidebar.caption(f"Summarization took {duration}")
     
 def show_search_page(query_term=None) -> None:
