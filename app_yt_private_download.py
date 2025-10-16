@@ -1,6 +1,7 @@
-import streamlit as st
-from src.youtube_private_utils import get_authorization_url, get_user_credentials, get_my_videos, get_transcript
 import os
+import streamlit as st
+from src.core_utils import normalize_query_value
+from src.youtube_private_utils import get_authorization_url, get_user_credentials, get_my_videos, get_transcript
 
 st.set_page_config(page_title="YouTube Private Video Downloader", page_icon=":movie_camera:")
 
@@ -15,10 +16,26 @@ if not os.path.exists("client_secret.json"):
 if "credentials" not in st.session_state:
     st.session_state.credentials = None
 
-query_params = st.query_params
-if "code" in query_params and not st.session_state.credentials:
+if hasattr(st, "query_params"):
+    query_params = st.query_params
+    raw_code = query_params.get("code")
+else:
+    query_params = st.experimental_get_query_params()
+    raw_code = query_params.get("code")
+
+auth_code = normalize_query_value(raw_code)
+st.write(f"DEBUG: {auth_code=}, {raw_code=}, {query_params=}")
+
+if auth_code and not st.session_state.credentials:
     try:
-        st.session_state.credentials = get_user_credentials(query_params["code"][0])
+        st.session_state.credentials = get_user_credentials(auth_code)
+        try:
+            if hasattr(query_params, "clear"):
+                query_params.clear()
+            else:
+                st.experimental_set_query_params()
+        except Exception:
+            pass
         st.rerun()
     except Exception as e:
         st.error(f"Error getting credentials: {e}")

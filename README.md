@@ -9,8 +9,9 @@ Initial project scaffold for the OpsDashboard application. The repository curren
 
 Some key files:
 - `utils/calendar_integration.py` exposes `CalendarClient` for Google Calendar access.
-- `utils/supabase_integration.py' exposes 'SupabaseClient' for database access.
+- `utils/supabase_integration.py` exposes `SupabaseClient` for database access.
 - `utils/posthog_integration.py` will centralize PostHog analytics helpers.
+- `src/core_utils.py` provides shared helpers such as query-parameter normalization for Streamlit pages.
 
 Update this document as features and dependencies are added.
 

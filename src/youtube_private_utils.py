@@ -24,7 +24,7 @@ def get_user_credentials(authorization_code):
         scopes=SCOPES,
         redirect_uri='http://localhost:8501'
     )
-    flow.fetch_token(authorization_code=authorization_code)
+    flow.fetch_token(code=authorization_code)
     return flow.credentials
 
 def get_authorization_url():
