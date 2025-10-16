@@ -18,7 +18,7 @@ if "credentials" not in st.session_state:
 query_params = st.query_params
 if "code" in query_params and not st.session_state.credentials:
     try:
-        st.session_state.credentials = get_user_credentials(query_params["code"])
+        st.session_state.credentials = get_user_credentials(query_params["code"][0])
         st.rerun()
     except Exception as e:
         st.error(f"Error getting credentials: {e}")
