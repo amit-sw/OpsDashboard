@@ -6,6 +6,8 @@ import json
 import urllib.parse
 import time
 
+from langsmith import traceable
+
 from langchain_openai import ChatOpenAI
 
 from google.oauth2.credentials import Credentials
@@ -170,6 +172,7 @@ def show_messages_in_ui(rows,max_rows=10):
                 show_row(idx,r)
                 st.divider()
 
+@traceable(run_type="tool")
 def search_ui(creds: Credentials, query_term=None) -> None:
     search_expression = " in:all newer_than:90d"
     if query_term:

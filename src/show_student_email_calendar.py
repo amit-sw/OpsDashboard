@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import time
 import os
+from langsmith import traceable
 
 from utils.supabase_integration import SupabaseClient
 from utils.calendar_integration import CalendarClient
@@ -85,6 +86,7 @@ def match_students_events(student_emails,events,parent_match=False):
             unmatched_students.append(extracted_record(student_email))
     return matched_students, unmatched_students
 
+@traceable(run_type="tool")
 def show_student_email_calendar():
     supabase=SupabaseClient(os.getenv('SUPABASE_URL'),os.getenv('SUPABASE_KEY'))
     calendar = CalendarClient(st.secrets.get('calendar'))

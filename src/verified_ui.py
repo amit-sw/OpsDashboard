@@ -1,5 +1,8 @@
 import streamlit as st
 import os
+from streamlit.runtime.scriptrunner_utils.exceptions import StopException
+
+from langsmith import traceable
 
 st.set_page_config(layout="wide")
 
@@ -31,8 +34,12 @@ def show_sidebar_ui(user):
             st.image(picture, width=100)
         
         if st.button("Log out"):
-            st.logout() 
+            try:
+                st.logout()
+            except StopException:
+                return
 
+@traceable(run_type="tool")
 def show_ui_core(user):
     show_sidebar_ui(user)
     
@@ -50,8 +57,14 @@ def show_ui_core(user):
     }
 
     pg = st.navigation(pages, position="top")
-    pg.run()
-    
+    try:
+        pg.run()
+    except StopException:
+        # Streamlit uses StopException internally to control reruns/navigation
+        # Swallow it so it doesn't get surfaced to external tracers/loggers
+        return
+
+@traceable(run_type="tool")    
 def show_ui_superadmin(user):
     show_sidebar_ui(user)
     #st.title("Admin Panel")
@@ -68,8 +81,12 @@ def show_ui_superadmin(user):
         ],
     }
     pg = st.navigation(pages, position="top")
-    pg.run()
-    
+    try:
+        pg.run()
+    except StopException:
+        return
+
+@traceable(run_type="tool")    
 def show_ui_admin(user):
     show_sidebar_ui(user)
     
@@ -89,20 +106,29 @@ def show_ui_admin(user):
     }
 
     pg = st.navigation(pages, position="top")
-    pg.run()
+    try:
+        pg.run()
+    except StopException:
+        return
 
+@traceable(run_type="tool")
 def show_ui_guest(user):
     st.title("Guest Access")
     st.write(f"You do not have access. Please reach out to System Administrator with your information\n Email: {user.get("email", "Unknown Email")}.")
     if st.button("Log out"):
-        st.logout()
+        try:
+            st.logout()
+        except StopException:
+            return
     #show_ui_core(user)
 
+@traceable(run_type="tool")
 def show_ui_user(user):
     #st.title("User Access")
     #st.write("Welcome to the user panel. More features coming soon!")
     show_ui_core(user)
 
+@traceable(run_type="tool")
 def show_ui(user):
     if user and user.get("email_verified", False):
         supabase = SupabaseClient(url=os.environ["SUPABASE_URL"], key=os.environ['SUPABASE_KEY'])

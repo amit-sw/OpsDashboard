@@ -1,5 +1,6 @@
 import streamlit as st
 import os
+from langsmith import traceable
 
 from datetime import datetime, timezone
 
@@ -118,7 +119,7 @@ def get_event_title(event):
     return event.get('summary', 'Untitled Event')
 
 
-
+@traceable(run_type="tool")
 def show_student_details(student_name, students, calendar):
     """Show detailed calendar events for a specific student"""
     st.title(f"Calendar Events for {student_name}")
@@ -257,6 +258,7 @@ def show_student_details(student_name, students, calendar):
             else:
                 st.info("No events match your search criteria.")
 
+@traceable(run_type="tool")
 def show_students_page():
     """Display the Students page content"""
     # Initialize session state variables if they don't exist
