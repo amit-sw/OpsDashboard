@@ -8,7 +8,6 @@ Authlib
 google-api-python-client
 google-auth-httplib2
 google-auth-oauthlib
-youtube-transcript-api
 
 langchain-openai
 langsmith

@@ -33,3 +33,9 @@ For deveelopers:
 5. To run the YouTube private video downloader:
    - Create a `client_secret.json` file in the root directory with your Google OAuth 2.0 credentials.
    - Run the app: `streamlit run app_yt_private_download.py`
+   - The first authorization persists tokens at `.tokens/youtube.json`. Stored credentials are reused automatically until they expire; use the sidebar "Sign out" button to clear them manually.
+   - Set `SUPABASE_URL` and `SUPABASE_KEY` environment variables (or add a `[supabase]` block in `secrets.toml`) to capture transcripts in the `youtube_private_videos` table. Each stored row includes the transcript segments with timing metadata inside the `transcript_segments` JSON column, a `transcript_downloaded_at` timestamp, and reruns only upload videos that have not been stored previously (videos are requested chronologically after the latest stored publish time).
+   - If you see an “insufficient permission” warning, use the sidebar “Sign out” button and reauthorize; the app now requests the `youtube.force-ssl` scope to download captions from the YouTube Data API.
+
+
+   We are keeping two sets of Google Credentials - one for Gmail, one for YT

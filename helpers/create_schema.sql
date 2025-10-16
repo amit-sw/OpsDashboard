@@ -181,6 +181,22 @@ alter sequence opsdashboard.confluence_pages_id_seq owned by opsdashboard.conflu
 alter table opsdashboard.confluence_pages
   alter column id set default nextval('opsdashboard.confluence_pages_id_seq');
 
+-- =========================================================
+-- youtube_private_videos
+-- =========================================================
+create table if not exists opsdashboard.youtube_private_videos (
+  video_id                  text primary key,
+  title                     text not null,
+  published_at              timestamptz,
+  video_url                 text,
+  transcript_segments       jsonb not null,
+  transcript_text           text,
+  transcript_downloaded_at  timestamptz not null default now()
+);
+
+grant select, insert, update, delete on opsdashboard.youtube_private_videos
+  to anon, authenticated;
+
 -- allow API roles to see the schema
 grant usage on schema opsdashboard to anon, authenticated;
 

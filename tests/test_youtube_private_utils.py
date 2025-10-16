@@ -24,7 +24,7 @@ class TestYoutubePrivateUtils(unittest.TestCase):
         get_user_credentials('test_auth_code')
 
         mock_flow.assert_called_once()
-        mock_flow_instance.fetch_token.assert_called_once_with(authorization_code='test_auth_code')
+        mock_flow_instance.fetch_token.assert_called_once_with(code='test_auth_code')
 
     @patch('src.youtube_private_utils.Flow.from_client_secrets_file')
     def test_get_authorization_url(self, mock_flow):
@@ -36,7 +36,11 @@ class TestYoutubePrivateUtils(unittest.TestCase):
 
         self.assertEqual(url, 'test_url')
         mock_flow.assert_called_once()
-        mock_flow_instance.authorization_url.assert_called_once_with(prompt='consent')
+        mock_flow_instance.authorization_url.assert_called_once_with(
+            prompt='consent',
+            access_type='offline',
+            include_granted_scopes='true'
+        )
 
     @patch('src.youtube_private_utils.get_authenticated_service')
     def test_get_my_videos(self, mock_get_service):
@@ -45,8 +49,8 @@ class TestYoutubePrivateUtils(unittest.TestCase):
 
         mock_search_response = {
             'items': [
-                {'id': {'videoId': 'video1'}, 'snippet': {'title': 'Title 1'}},
-                {'id': {'videoId': 'video2'}, 'snippet': {'title': 'Title 2'}},
+                {'id': {'videoId': 'video1'}, 'snippet': {'title': 'Title 1', 'publishedAt': '2024-01-01T00:00:00Z'}},
+                {'id': {'videoId': 'video2'}, 'snippet': {'title': 'Title 2', 'publishedAt': '2024-01-02T00:00:00Z'}},
             ]
         }
         mock_youtube.search.return_value.list.return_value.execute.return_value = mock_search_response
@@ -56,13 +60,13 @@ class TestYoutubePrivateUtils(unittest.TestCase):
         self.assertEqual(videos[0]['video_id'], 'video1')
         self.assertEqual(videos[0]['title'], 'Title 1')
 
-    @patch('src.youtube_private_utils.YouTubeTranscriptApi')
-    def test_get_transcript(self, mock_api):
-        mock_api.get_transcript.return_value = [{'text': 'Hello'}, {'text': 'world'}]
+    @patch('src.youtube_private_utils.get_transcript_segments')
+    def test_get_transcript(self, mock_get_segments):
+        mock_get_segments.return_value = [{'text': 'Hello'}, {'text': 'world'}]
 
-        transcript = get_transcript('test_video_id')
+        transcript = get_transcript('test_video_id', service=MagicMock())
         self.assertEqual(transcript, 'Hello world')
-        mock_api.get_transcript.assert_called_once_with('test_video_id')
+        mock_get_segments.assert_called_once()
 
 if __name__ == '__main__':
     unittest.main()
