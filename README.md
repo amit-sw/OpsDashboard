@@ -20,6 +20,7 @@ For DB managers:
 
 Entry points:
 * app.py: Main entry point
+* app_yt_private_download.py: Streamlit app to download transcripts from private YouTube videos.
 * test_app.py: Used for testing sub-functionality in isolation during development
 * helpers/ : Code written for non-App use (e.g. loading specific tables)
 
@@ -27,4 +28,7 @@ For deveelopers:
 1. python -m venv .venv
 2. source .venv/bin/activate
 3. pip install -r requirements.txt
-4. streamlit run app.py
+4. To run the main app: `streamlit run app.py`
+5. To run the YouTube private video downloader:
+   - Create a `client_secret.json` file in the root directory with your Google OAuth 2.0 credentials.
+   - Run the app: `streamlit run app_yt_private_download.py`
