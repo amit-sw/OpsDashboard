@@ -43,6 +43,26 @@ class YouTubeVideoRepository:
             return None
         return rows[0].get("published_at")
 
+    def earliest_published_at(self) -> Optional[str]:
+        supabase = getattr(self._client, "supabase", None)
+        if supabase is None:
+            return None
+        try:
+            response = (
+                supabase.table(self._table_name)
+                .select("published_at")
+                .order("published_at", desc=False)
+                .limit(1)
+                .execute()
+            )
+        except Exception as exc:  # pragma: no cover - logged for observability
+            print(f"Error fetching earliest YouTube video timestamp: {exc}")
+            return None
+        rows = getattr(response, "data", []) or []
+        if not rows:
+            return None
+        return rows[0].get("published_at")
+
     def existing_ids_for(self, video_ids: Iterable[str]) -> Set[str]:
         supabase = getattr(self._client, "supabase", None)
         unique_ids = {vid for vid in video_ids if vid}

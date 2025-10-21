@@ -11,7 +11,7 @@ def test_st_secrets():
         st.json(secrets)    
 
 def test_supabase_integration():
-    supabase = SupabaseClient(url=os.environ["SUPABASE_URL"], key=os.environ['SUPABASE_KEY'])
+    supabase = SupabaseClient(url=st.secrets.get("env", {}).get("SUPABASE_URL"), key=st.secrets.get("env", {}).get("SUPABASE_KEY"))
     if supabase:
         user_records = supabase.get_students_from_db()
         with st.expander("Students"):
@@ -80,9 +80,10 @@ def test_gmail_credentials() -> None:
         
 def test_confluence_links():
     full_name=st.text_input("Student name")
-    supabase = SupabaseClient(url=os.environ["SUPABASE_URL"], key=os.environ['SUPABASE_KEY'])
+    supabase = SupabaseClient(url=st.secrets.get("env", {}).get("SUPABASE_URL"), key=st.secrets.get("env", {}).get("SUPABASE_KEY"))
     responses = supabase.get_confluence_pages(full_name)
-    for resp in responses:
+    if responses:
+        for resp in responses:
         title=resp.get('title', 'No title')
         page_url=resp.get('page_url', 'https://aiclub.world')
         st.write(f"{resp=}")

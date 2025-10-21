@@ -292,6 +292,67 @@ def _playlist_pages(service, playlist_id: str):
             break
 
 
+def _search_pages(service, **kwargs):
+    page_token: Optional[str] = None
+    while True:
+        params = kwargs.copy()
+        if page_token:
+            params["pageToken"] = page_token
+        response = service.search().list(**params).execute()
+        yield response
+        page_token = response.get("nextPageToken")
+        if not page_token:
+            break
+
+
+def _search_item_to_video(item: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    if item.get("id", {}).get("kind") != "youtube#video":
+        return None
+    video_id = item.get("id", {}).get("videoId")
+    if not video_id:
+        return None
+    snippet = item.get("snippet", {})
+    return {
+        "video_id": video_id,
+        "title": snippet.get("title", ""),
+        "published_at": snippet.get("publishedAt"),
+    }
+
+
+def _search_videos(
+    service,
+    channel_id: str,
+    max_results: Optional[int],
+    published_after: Optional[str],
+    published_before: Optional[str],
+) -> List[Dict[str, Any]]:
+    collected: List[Dict[str, Any]] = []
+    params = {
+        "part": "snippet",
+        "channelId": channel_id,
+        "type": "video",
+        "order": "date",
+        "maxResults": 50,
+        "forMine": True,
+    }
+    if published_after:
+        params["publishedAfter"] = published_after
+    if published_before:
+        params["publishedBefore"] = published_before
+    for response in _search_pages(service, **params):
+        for item in response.get("items", []):
+            video = _search_item_to_video(item)
+            if not video:
+                continue
+            published_at = video.get("published_at") or ""
+            if published_after and published_at and published_at < published_after:
+                continue
+            collected.append(video)
+            if max_results and len(collected) >= max_results:
+                return collected
+    return collected
+
+
 def _collect_videos_from_playlist(
     service,
     playlist_id: str,
@@ -312,11 +373,13 @@ def _collect_videos_from_playlist(
                 return collected
     return collected
 
+
 @traceable(run_type="tool")
 def get_my_videos(
     credentials: Optional[Credentials],
     max_results: int = 10,
     published_after: Optional[Any] = None,
+    published_before: Optional[Any] = None,
     *,
     service=None,
     channel_id: Optional[str] = None,
@@ -332,14 +395,23 @@ def get_my_videos(
         now_iso = _format_rfc3339(datetime.now(timezone.utc))
         if published_after_str > now_iso:
             published_after_str = now_iso
-    playlist_id = uploads_playlist_id or _get_uploads_playlist_id(service, channel_id=channel_id)
-    collected = _collect_videos_from_playlist(
+    published_before_str = _to_rfc3339(published_before)
+    if published_before_str:
+        now_iso = _format_rfc3339(datetime.now(timezone.utc))
+        if published_before_str > now_iso:
+            published_before_str = now_iso
+    channel_id = channel_id or list_my_channels(service)[0]["channel_id"]
+    if not channel_id:
+        raise RuntimeError("Unable to determine the channel ID.")
+    collected = _search_videos(
         service,
-        playlist_id,
+        channel_id,
         max_results,
         published_after_str,
+        published_before_str,
     )
-    collected.sort(key=lambda v: v.get("published_at") or "")
+    if published_after_str:
+        collected.sort(key=lambda v: v.get("published_at") or "")
     if max_results and len(collected) > max_results:
         return collected[:max_results]
     return collected
