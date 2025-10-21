@@ -1,8 +1,11 @@
 import os
 from datetime import datetime, timezone
 
+from langsmith import traceable
+
 import streamlit as st
 from google.auth.exceptions import RefreshError
+from googleapiclient.errors import HttpError
 from src.core_utils import normalize_query_value, transcript_segments_to_text
 from src.youtube_private_utils import (
     clear_stored_credentials,
@@ -10,6 +13,7 @@ from src.youtube_private_utils import (
     get_authenticated_service,
     get_my_videos,
     get_user_credentials,
+    list_my_channels,
     get_transcript_segments,
     load_stored_credentials,
     refresh_credentials,
@@ -22,6 +26,8 @@ from utils.supabase_integration import SupabaseClient
 
 
 from utils.utils_credentials import setup_env_from_dict
+
+
 
 st.set_page_config(page_title="YouTube Private Video Downloader", page_icon=":movie_camera:")
 
@@ -47,7 +53,7 @@ def load_supabase_client():
         return None
     return client
 
-
+@traceable(run_type="tool")
 def build_video_record(video, segments, transcript_text):
     return {
         "video_id": video["video_id"],
@@ -87,13 +93,7 @@ if not st.session_state.credentials:
                     clear_stored_credentials()
                     st.info("Stored credentials have expired. Please sign in again.")
 
-if hasattr(st, "query_params"):
-    query_params = st.query_params
-    raw_code = query_params.get("code")
-else:
-    query_params = st.experimental_get_query_params()
-    raw_code = query_params.get("code")
-
+raw_code = st.query_params.get("code")
 auth_code = normalize_query_value(raw_code)
 
 if auth_code and not st.session_state.credentials:
@@ -102,8 +102,8 @@ if auth_code and not st.session_state.credentials:
         save_credentials(credentials)
         st.session_state.credentials = credentials
         try:
-            if hasattr(query_params, "clear"):
-                query_params.clear()
+            if hasattr(st.query_params, "clear"):
+                st.query_params.clear()
             else:
                 st.experimental_set_query_params()
         except Exception:
@@ -119,21 +119,69 @@ if st.session_state.credentials:
             clear_stored_credentials()
             st.session_state.credentials = None
             st.rerun()
-    number_of_videos = st.number_input("Enter the number of videos to download:", min_value=1, value=10)
+    try:
+        service = get_authenticated_service(st.session_state.credentials)
+        channels = list_my_channels(service)
+    except HttpError as exc:
+        st.error(f"Could not fetch YouTube channels: {exc}")
+        st.stop()
+    except RuntimeError as exc:
+        st.error(str(exc))
+        st.stop()
+    if not channels:
+        st.error("No YouTube channels are available for this account.")
+        st.stop()
+    channel_lookup = {}
+    for channel in channels:
+        title = channel.get("title") or "Untitled"
+        channel_id = channel.get("channel_id") or "unknown"
+        label = f"{title} ({channel_id})"
+        channel_lookup[label] = channel
+    channel_label = st.selectbox("Choose a YouTube channel", list(channel_lookup.keys()))
+    selected_channel = channel_lookup[channel_label]
+    uploads_playlist_id = selected_channel.get("uploads_playlist_id")
+    if not uploads_playlist_id:
+        st.warning("The selected channel does not expose an uploads playlist.")
+    fetch_all_videos = st.checkbox("Download every uploaded video from this channel", value=False)
+    number_of_videos = st.number_input(
+        "Enter the number of videos to download:",
+        min_value=1,
+        value=10,
+        disabled=fetch_all_videos,
+    )
 
     if st.button("Download Transcripts"):
+        if not uploads_playlist_id:
+            st.error("Unable to locate the uploads playlist for the selected channel.")
+            st.stop()
         supabase_client = load_supabase_client()
         repository = YouTubeVideoRepository(supabase_client) if supabase_client else None
-        latest_published = repository.latest_published_at() if repository else None
+        latest_published = None
+        if repository and not fetch_all_videos:
+            latest_published = repository.latest_published_at()
         new_records = []
+        quota_exceeded = False
         with st.spinner("Downloading transcripts..."):
-            service = get_authenticated_service(st.session_state.credentials)
-            videos = get_my_videos(
-                st.session_state.credentials,
-                number_of_videos,
-                published_after=latest_published,
-                service=service,
-            )
+            try:
+                videos = get_my_videos(
+                    st.session_state.credentials,
+                    None if fetch_all_videos else int(number_of_videos),
+                    published_after=latest_published,
+                    service=service,
+                    channel_id=selected_channel.get("channel_id"),
+                    uploads_playlist_id=uploads_playlist_id,
+                )
+            except HttpError as exc:
+                message = ""
+                try:
+                    message = exc.content.decode("utf-8", errors="ignore")
+                except Exception:
+                    message = str(exc)
+                if exc.resp.status == 403 and "quota" in message.lower():
+                    quota_exceeded = True
+                    videos = []
+                else:
+                    raise
 
             if not videos:
                 st.warning("No videos found.")
@@ -141,6 +189,8 @@ if st.session_state.credentials:
                 st.success(f"Found {len(videos)} videos.")
                 if repository and latest_published:
                     st.caption(f"Only videos published after {latest_published} were requested.")
+                elif fetch_all_videos:
+                    st.caption("All available uploads from this channel were requested.")
                 existing_ids = (
                     repository.existing_ids_for(video["video_id"] for video in videos) if repository else set()
                 )
@@ -162,7 +212,11 @@ if st.session_state.credentials:
                     st.text_area(f"Transcript for {video['title']}", transcript_text or "No transcript available.", height=200)
                     if repository and video["video_id"] not in existing_ids and segments:
                         new_records.append(build_video_record(video, segments, transcript_text))
-        if repository:
+        if quota_exceeded:
+            st.error(
+                "YouTube API quota has been exceeded. Please wait for quota to reset or reduce the requested range."
+            )
+        elif repository:
             if new_records:
                 repository.insert_records(new_records)
                 st.success(f"Stored {len(new_records)} new videos in Supabase.")

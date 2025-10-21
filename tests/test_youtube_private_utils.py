@@ -6,6 +6,7 @@ from src.youtube_private_utils import (
     get_authorization_url,
     get_my_videos,
     get_transcript,
+    list_my_channels,
 )
 
 class TestYoutubePrivateUtils(unittest.TestCase):
@@ -47,18 +48,62 @@ class TestYoutubePrivateUtils(unittest.TestCase):
         mock_youtube = MagicMock()
         mock_get_service.return_value = mock_youtube
 
-        mock_search_response = {
+        mock_playlist_response = {
             'items': [
-                {'id': {'videoId': 'video1'}, 'snippet': {'title': 'Title 1', 'publishedAt': '2024-01-01T00:00:00Z'}},
-                {'id': {'videoId': 'video2'}, 'snippet': {'title': 'Title 2', 'publishedAt': '2024-01-02T00:00:00Z'}},
+                {
+                    'contentDetails': {'videoId': 'video1', 'videoPublishedAt': '2024-01-01T00:00:00Z'},
+                    'snippet': {'title': 'Title 1'},
+                },
+                {
+                    'contentDetails': {'videoId': 'video2', 'videoPublishedAt': '2024-01-02T00:00:00Z'},
+                    'snippet': {'title': 'Title 2'},
+                },
             ]
         }
-        mock_youtube.search.return_value.list.return_value.execute.return_value = mock_search_response
+        mock_channels = MagicMock()
+        mock_channels.list.return_value.execute.return_value = {
+            'items': [
+                {
+                    'id': 'channel-1',
+                    'snippet': {'title': 'Title Channel'},
+                    'contentDetails': {'relatedPlaylists': {'uploads': 'UPLOADS'}}
+                }
+            ]
+        }
+        mock_playlist_items = MagicMock()
+        mock_playlist_items.list.return_value.execute.return_value = mock_playlist_response
+
+        mock_youtube.channels.return_value = mock_channels
+        mock_youtube.playlistItems.return_value = mock_playlist_items
 
         videos = get_my_videos('test_credentials', 2)
         self.assertEqual(len(videos), 2)
         self.assertEqual(videos[0]['video_id'], 'video1')
         self.assertEqual(videos[0]['title'], 'Title 1')
+
+    def test_list_my_channels(self):
+        mock_youtube = MagicMock()
+        mock_channels = MagicMock()
+        mock_channels.list.return_value.execute.return_value = {
+            'items': [
+                {
+                    'id': 'channel-1',
+                    'snippet': {'title': 'Primary'},
+                    'contentDetails': {'relatedPlaylists': {'uploads': 'UPLOADS1'}}
+                },
+                {
+                    'id': 'channel-2',
+                    'snippet': {'title': 'Brand'},
+                    'contentDetails': {'relatedPlaylists': {'uploads': 'UPLOADS2'}}
+                },
+            ]
+        }
+        mock_youtube.channels.return_value = mock_channels
+
+        channels = list_my_channels(mock_youtube)
+
+        self.assertEqual(channels[0]['channel_id'], 'channel-1')
+        self.assertEqual(channels[1]['uploads_playlist_id'], 'UPLOADS2')
 
     @patch('src.youtube_private_utils.get_transcript_segments')
     def test_get_transcript(self, mock_get_segments):

@@ -35,6 +35,8 @@ For deveelopers:
    - Run the app: `streamlit run app_yt_private_download.py`
    - The first authorization persists tokens at `.tokens/youtube.json`. Stored credentials are reused automatically until they expire; use the sidebar "Sign out" button to clear them manually.
    - Set `SUPABASE_URL` and `SUPABASE_KEY` environment variables (or add a `[supabase]` block in `secrets.toml`) to capture transcripts in the `youtube_private_videos` table. Each stored row includes the transcript segments with timing metadata inside the `transcript_segments` JSON column, a `transcript_downloaded_at` timestamp, and reruns only upload videos that have not been stored previously (videos are requested chronologically after the latest stored publish time).
+   - Video discovery now queries the channel's uploads playlist via the YouTube `playlistItems` API to ensure private videos are included; `published_after` filtering happens client-side before results are returned. Use the new checkbox to fetch *all* uploaded videos (private/unlisted/public) when bootstrapping a channel.
+   - When multiple channels are linked to the Google account, pick the desired channel in the dropdown before downloading transcripts; the selected channel's uploads playlist drives retrieval.
    - If you see an “insufficient permission” warning, use the sidebar “Sign out” button and reauthorize; the app now requests the `youtube.force-ssl` scope to download captions from the YouTube Data API.
 
 

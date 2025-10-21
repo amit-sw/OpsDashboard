@@ -4,6 +4,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence
 
+from langsmith import traceable
+
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
@@ -192,58 +194,157 @@ def clear_stored_credentials(token_path: Path = TOKEN_FILE) -> None:
         token_path.unlink()
 
 
+def _format_rfc3339(dt: datetime) -> str:
+    return dt.astimezone(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
 def _to_rfc3339(value: Optional[Any]) -> Optional[str]:
     if value is None:
         return None
     if isinstance(value, str):
-        return value
+        text = value.strip()
+        if text.endswith("Z"):
+            if "." in text:
+                try:
+                    parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+                    return _format_rfc3339(parsed)
+                except ValueError:
+                    return text.split(".")[0] + "Z"
+            return text
+        try:
+            parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+        except ValueError:
+            return text
+        return _format_rfc3339(parsed)
     if isinstance(value, datetime):
         if value.tzinfo is None:
             value = value.replace(tzinfo=timezone.utc)
-        return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+        return _format_rfc3339(value)
     return str(value)
 
 
+def list_my_channels(service) -> List[Dict[str, Any]]:
+    response = service.channels().list(
+        part="snippet,contentDetails",
+        mine=True,
+        maxResults=50,
+    ).execute()
+    channels: List[Dict[str, Any]] = []
+    for item in response.get("items", []):
+        channels.append(
+            {
+                "channel_id": item.get("id"),
+                "title": item.get("snippet", {}).get("title", ""),
+                "uploads_playlist_id": item.get("contentDetails", {})
+                .get("relatedPlaylists", {})
+                .get("uploads"),
+            }
+        )
+    return channels
+
+
+def _get_uploads_playlist_id(service, channel_id: Optional[str] = None) -> str:
+    channels = list_my_channels(service)
+    if not channels:
+        raise RuntimeError("No channels found for the authenticated user.")
+    if channel_id:
+        for channel in channels:
+            if channel.get("channel_id") == channel_id:
+                playlist_id = channel.get("uploads_playlist_id")
+                break
+        else:
+            raise RuntimeError(f"Channel {channel_id} is not available.")
+    else:
+        playlist_id = channels[0].get("uploads_playlist_id")
+    if not playlist_id:
+        raise RuntimeError("Uploads playlist is unavailable for this account.")
+    return playlist_id
+
+
+def _playlist_item_to_video(item: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    details = item.get("contentDetails", {})
+    snippet = item.get("snippet", {})
+    video_id = details.get("videoId") or snippet.get("resourceId", {}).get("videoId")
+    if not video_id:
+        return None
+    published_at = details.get("videoPublishedAt") or snippet.get("publishedAt")
+    return {
+        "video_id": video_id,
+        "title": snippet.get("title", ""),
+        "published_at": published_at,
+    }
+
+
+def _playlist_pages(service, playlist_id: str):
+    page_token: Optional[str] = None
+    while True:
+        params = {
+            "part": "snippet,contentDetails",
+            "playlistId": playlist_id,
+            "maxResults": 50,
+        }
+        if page_token:
+            params["pageToken"] = page_token
+        response = service.playlistItems().list(**params).execute()
+        yield response
+        page_token = response.get("nextPageToken")
+        if not page_token:
+            break
+
+
+def _collect_videos_from_playlist(
+    service,
+    playlist_id: str,
+    max_results: Optional[int],
+    published_after: Optional[str],
+) -> List[Dict[str, Any]]:
+    collected: List[Dict[str, Any]] = []
+    for response in _playlist_pages(service, playlist_id):
+        for item in response.get("items", []):
+            video = _playlist_item_to_video(item)
+            if not video:
+                continue
+            published_at = video.get("published_at") or ""
+            if published_after and published_at and published_at < published_after:
+                return collected
+            collected.append(video)
+            if max_results and len(collected) >= max_results:
+                return collected
+    return collected
+
+@traceable(run_type="tool")
 def get_my_videos(
     credentials: Optional[Credentials],
     max_results: int = 10,
     published_after: Optional[Any] = None,
     *,
     service=None,
+    channel_id: Optional[str] = None,
+    uploads_playlist_id: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     if service is None:
         if credentials is None:
             raise ValueError("credentials or service must be provided")
         service = get_authenticated_service(credentials)
     collected: List[Dict[str, Any]] = []
-    page_token: Optional[str] = None
     published_after_str = _to_rfc3339(published_after)
-    while len(collected) < max_results:
-        params = {
-            "part": "snippet",
-            "forMine": True,
-            "type": "video",
-            "order": "date",
-            "maxResults": min(50, max_results - len(collected)),
-        }
-        if page_token:
-            params["pageToken"] = page_token
-        if published_after_str:
-            params["publishedAfter"] = published_after_str
-        response = service.search().list(**params).execute()
-        items = response.get("items", [])
-        collected.extend({
-            "video_id": item["id"]["videoId"],
-            "title": item.get("snippet", {}).get("title", ""),
-            "published_at": item.get("snippet", {}).get("publishedAt"),
-        } for item in items if item.get("id", {}).get("videoId"))
-        page_token = response.get("nextPageToken")
-        if not page_token:
-            break
+    if published_after_str:
+        now_iso = _format_rfc3339(datetime.now(timezone.utc))
+        if published_after_str > now_iso:
+            published_after_str = now_iso
+    playlist_id = uploads_playlist_id or _get_uploads_playlist_id(service, channel_id=channel_id)
+    collected = _collect_videos_from_playlist(
+        service,
+        playlist_id,
+        max_results,
+        published_after_str,
+    )
     collected.sort(key=lambda v: v.get("published_at") or "")
+    if max_results and len(collected) > max_results:
+        return collected[:max_results]
     return collected
 
-
+@traceable(run_type="tool")
 def get_transcript(
     video_id: str,
     *,

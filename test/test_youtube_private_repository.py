@@ -100,3 +100,11 @@ def test_existing_ids_for_limits_results():
     repo = YouTubeVideoRepository(client)
 
     assert repo.existing_ids_for(["x", "z"]) == {"x"}
+
+
+def test_latest_published_at_returns_none_when_empty():
+    supabase = _FakeSupabase(latest_data=[])
+    client = SimpleNamespace(supabase=supabase)
+    repo = YouTubeVideoRepository(client)
+
+    assert repo.latest_published_at() is None

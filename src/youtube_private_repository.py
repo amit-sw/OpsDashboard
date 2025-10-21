@@ -1,4 +1,7 @@
-from typing import Iterable, List, Mapping, Set
+from datetime import datetime, timedelta, timezone
+from typing import Iterable, List, Mapping, Optional, Set
+
+from langsmith import traceable
 
 
 class YouTubeVideoRepository:
@@ -20,7 +23,7 @@ class YouTubeVideoRepository:
         rows = getattr(response, "data", []) or []
         return {row.get("video_id") for row in rows if row.get("video_id")}
 
-    def latest_published_at(self) -> str | None:
+    def latest_published_at(self) -> Optional[str]:
         supabase = getattr(self._client, "supabase", None)
         if supabase is None:
             return None

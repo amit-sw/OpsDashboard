@@ -41,7 +41,7 @@ class _DummyCredentials:
         return cls(info["token"], info.get("refresh_token"))
 
 
-class _FakeSearchInvoker:
+class _FakePlaylistItemsInvoker:
     def __init__(self, parent, params):
         self._parent = parent
         self._params = params
@@ -51,13 +51,23 @@ class _FakeSearchInvoker:
         return self._parent.responses.pop(0)
 
 
-class _FakeSearch:
+class _FakePlaylistItems:
     def __init__(self, responses):
         self.responses = list(responses)
         self.calls = []
 
     def list(self, **params):
-        return _FakeSearchInvoker(self, params)
+        return _FakePlaylistItemsInvoker(self, params)
+
+
+class _FakeChannels:
+    def __init__(self, response):
+        self.response = response
+        self.calls = []
+
+    def list(self, **params):
+        self.calls.append(params)
+        return SimpleNamespace(execute=lambda: self.response)
 
 
 class _FakeCaptions:
@@ -74,15 +84,19 @@ class _FakeCaptions:
 
 
 class _FakeYouTubeService:
-    def __init__(self, search_responses, caption_response):
-        self._search = _FakeSearch(search_responses)
+    def __init__(self, playlist_responses, caption_response, channels_response):
+        self._playlist_items = _FakePlaylistItems(playlist_responses)
         self._captions = _FakeCaptions(caption_response)
+        self._channels = _FakeChannels(channels_response)
 
-    def search(self):
-        return self._search
+    def playlistItems(self):
+        return self._playlist_items
 
     def captions(self):
         return self._captions
+
+    def channels(self):
+        return self._channels
 
 
 def test_get_user_credentials_passes_code(monkeypatch):
@@ -154,37 +168,184 @@ def test_get_my_videos_paginates_and_sorts(monkeypatch):
     responses = [
         {
             "items": [
-                {"id": {"videoId": "b"}, "snippet": {"title": "Two", "publishedAt": "2024-01-02T00:00:00Z"}},
+                {
+                    "contentDetails": {"videoId": "b", "videoPublishedAt": "2024-01-02T00:00:00Z"},
+                    "snippet": {"title": "Two"},
+                },
             ],
             "nextPageToken": "TOKEN",
         },
         {
             "items": [
-                {"id": {"videoId": "a"}, "snippet": {"title": "One", "publishedAt": "2024-01-01T00:00:00Z"}},
-                {"id": {"videoId": "c"}, "snippet": {"title": "Three", "publishedAt": "2024-01-03T00:00:00Z"}},
+                {
+                    "contentDetails": {"videoId": "c", "videoPublishedAt": "2024-01-03T00:00:00Z"},
+                    "snippet": {"title": "Three"},
+                },
+                {
+                    "contentDetails": {"videoId": "a", "videoPublishedAt": "2024-01-01T00:00:00Z"},
+                    "snippet": {"title": "One"},
+                },
             ],
         },
     ]
-    service = _FakeYouTubeService(search_responses=responses, caption_response={"items": []})
+    channel_payload = {
+        "items": [
+            {
+                "id": "channel-1",
+                "snippet": {"title": "Channel 1"},
+                "contentDetails": {"relatedPlaylists": {"uploads": "UPLOADS"}},
+            },
+        ]
+    }
+    service = _FakeYouTubeService(
+        playlist_responses=responses,
+        caption_response={"items": []},
+        channels_response=channel_payload,
+    )
     monkeypatch.setattr(youtube_private_utils, "get_authenticated_service", lambda _creds: service)
 
     videos = youtube_private_utils.get_my_videos("creds", max_results=3, published_after="2024-01-01T00:00:00Z")
 
     assert [v["video_id"] for v in videos] == ["a", "b", "c"]
-    assert service.search().calls[0]["publishedAfter"] == "2024-01-01T00:00:00Z"
+    assert [call["playlistId"] for call in service.playlistItems().calls] == ["UPLOADS", "UPLOADS"]
+    assert service.channels().calls[0]["mine"] is True
 
 
 def test_get_my_videos_accepts_datetime(monkeypatch):
-    service = _FakeYouTubeService(search_responses=[{"items": []}], caption_response={"items": []})
+    responses = [
+        {
+            "items": [
+                {
+                    "contentDetails": {"videoId": "keep", "videoPublishedAt": "2024-01-02T00:00:00Z"},
+                    "snippet": {"title": "Keep"},
+                },
+                {
+                    "contentDetails": {"videoId": "skip", "videoPublishedAt": "2023-12-31T23:00:00Z"},
+                    "snippet": {"title": "Skip"},
+                },
+            ],
+        }
+    ]
+    channel_payload = {
+        "items": [
+            {
+                "id": "channel-1",
+                "snippet": {"title": "Channel 1"},
+                "contentDetails": {"relatedPlaylists": {"uploads": "UPLOADS"}},
+            },
+        ]
+    }
+    service = _FakeYouTubeService(
+        playlist_responses=responses,
+        caption_response={"items": []},
+        channels_response=channel_payload,
+    )
     monkeypatch.setattr(youtube_private_utils, "get_authenticated_service", lambda _creds: service)
 
-    youtube_private_utils.get_my_videos(
+    videos = youtube_private_utils.get_my_videos(
         "creds",
         max_results=1,
         published_after=datetime(2024, 1, 1, tzinfo=timezone.utc),
     )
 
-    assert service.search().calls[0]["publishedAfter"] == "2024-01-01T00:00:00Z"
+    assert [v["video_id"] for v in videos] == ["keep"]
+
+
+def test_get_my_videos_normalizes_iso_strings(monkeypatch):
+    responses = [
+        {
+            "items": [
+                {
+                    "contentDetails": {"videoId": "keep", "videoPublishedAt": "2024-01-01T00:00:00Z"},
+                    "snippet": {"title": "Keep"},
+                },
+                {
+                    "contentDetails": {"videoId": "skip", "videoPublishedAt": "2023-12-31T23:59:59Z"},
+                    "snippet": {"title": "Skip"},
+                },
+            ],
+        }
+    ]
+    channel_payload = {
+        "items": [
+            {
+                "id": "channel-1",
+                "snippet": {"title": "Channel 1"},
+                "contentDetails": {"relatedPlaylists": {"uploads": "UPLOADS"}},
+            },
+        ]
+    }
+    service = _FakeYouTubeService(
+        playlist_responses=responses,
+        caption_response={"items": []},
+        channels_response=channel_payload,
+    )
+    monkeypatch.setattr(youtube_private_utils, "get_authenticated_service", lambda _creds: service)
+
+    videos = youtube_private_utils.get_my_videos(
+        "creds",
+        max_results=1,
+        published_after="2024-01-01T00:00:00+00:00",
+    )
+
+    assert [v["video_id"] for v in videos] == ["keep"]
+
+
+def test_list_my_channels_returns_expected_shape():
+    responses = [{"items": []}]
+    channel_payload = {
+        "items": [
+            {
+                "id": "channel-1",
+                "snippet": {"title": "Primary"},
+                "contentDetails": {"relatedPlaylists": {"uploads": "UPLOADS1"}},
+            },
+            {
+                "id": "channel-2",
+                "snippet": {"title": "Brand"},
+                "contentDetails": {"relatedPlaylists": {"uploads": "UPLOADS2"}},
+            },
+        ]
+    }
+    service = _FakeYouTubeService(
+        playlist_responses=responses,
+        caption_response={"items": []},
+        channels_response=channel_payload,
+    )
+
+    channels = youtube_private_utils.list_my_channels(service)
+
+    assert channels[0]["channel_id"] == "channel-1"
+    assert channels[1]["uploads_playlist_id"] == "UPLOADS2"
+
+
+def test_get_my_videos_respects_explicit_playlist(monkeypatch):
+    responses = [
+        {
+            "items": [
+                {
+                    "contentDetails": {"videoId": "x", "videoPublishedAt": "2024-01-02T00:00:00Z"},
+                    "snippet": {"title": "X"},
+                }
+            ]
+        }
+    ]
+    channel_payload = {"items": []}
+    service = _FakeYouTubeService(
+        playlist_responses=responses,
+        caption_response={"items": []},
+        channels_response=channel_payload,
+    )
+    monkeypatch.setattr(youtube_private_utils, "get_authenticated_service", lambda _creds: service)
+
+    videos = youtube_private_utils.get_my_videos(
+        "creds",
+        max_results=1,
+        published_after=None,
+        uploads_playlist_id="UPLOADS",
+    )
+
+    assert [call["playlistId"] for call in service.playlistItems().calls] == ["UPLOADS"]
 
 
 def test_get_transcript_segments_uses_caption_download(monkeypatch):
@@ -193,7 +354,11 @@ def test_get_transcript_segments_uses_caption_download(monkeypatch):
             {"id": "caption1", "snippet": {"language": "en", "trackKind": "standard", "isDraft": False}}
         ]
     }
-    service = _FakeYouTubeService(search_responses=[{"items": []}], caption_response=caption_response)
+    service = _FakeYouTubeService(
+        playlist_responses=[{"items": []}],
+        caption_response=caption_response,
+        channels_response={"items": []},
+    )
     downloaded = {"called_with": None}
 
     def fake_download_caption_srt(_service, caption_id, tfmt="srt"):
@@ -209,14 +374,22 @@ def test_get_transcript_segments_uses_caption_download(monkeypatch):
 
 
 def test_get_transcript_segments_raises_when_missing_caption(monkeypatch):
-    service = _FakeYouTubeService(search_responses=[{"items": []}], caption_response={"items": []})
+    service = _FakeYouTubeService(
+        playlist_responses=[{"items": []}],
+        caption_response={"items": []},
+        channels_response={"items": []},
+    )
 
     with pytest.raises(youtube_private_utils.TranscriptRetrievalError):
         youtube_private_utils.get_transcript_segments("video123", service=service)
 
 
 def test_get_transcript_segments_reports_insufficient_permissions(monkeypatch):
-    service = _FakeYouTubeService(search_responses=[{"items": []}], caption_response={"items": []})
+    service = _FakeYouTubeService(
+        playlist_responses=[{"items": []}],
+        caption_response={"items": []},
+        channels_response={"items": []},
+    )
 
     class Response:
         def __init__(self, status):
@@ -242,6 +415,13 @@ def test_get_transcript_returns_error_message(monkeypatch):
 
     monkeypatch.setattr(youtube_private_utils, "get_transcript_segments", fake_get_segments)
 
-    text = youtube_private_utils.get_transcript("video123", service=_FakeYouTubeService([], {"items": []}))
+    text = youtube_private_utils.get_transcript(
+        "video123",
+        service=_FakeYouTubeService(
+            playlist_responses=[],
+            caption_response={"items": []},
+            channels_response={"items": []},
+        ),
+    )
 
     assert "boom" in text
