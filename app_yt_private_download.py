@@ -139,9 +139,14 @@ if st.session_state.credentials:
         channel_lookup[label] = channel
     channel_label = st.selectbox("Choose a YouTube channel", list(channel_lookup.keys()))
     selected_channel = channel_lookup[channel_label]
-    uploads_playlist_id = selected_channel.get("uploads_playlist_id")
-    if not uploads_playlist_id:
-        st.warning("The selected channel does not expose an uploads playlist.")
+    mode = st.radio(
+        "Select download mode",
+        ("Expand", "Explore"),
+        help=(
+            "**Expand**: Start with the newest video in Supabase and go forward in time.\n"
+            "**Explore**: Start with the oldest video in Supabase and go backward in time."
+        ),
+    )
     fetch_all_videos = st.checkbox("Download every uploaded video from this channel", value=False)
     number_of_videos = st.number_input(
         "Enter the number of videos to download:",
@@ -151,14 +156,15 @@ if st.session_state.credentials:
     )
 
     if st.button("Download Transcripts"):
-        if not uploads_playlist_id:
-            st.error("Unable to locate the uploads playlist for the selected channel.")
-            st.stop()
         supabase_client = load_supabase_client()
         repository = YouTubeVideoRepository(supabase_client) if supabase_client else None
-        latest_published = None
+        published_after = None
+        published_before = None
         if repository and not fetch_all_videos:
-            latest_published = repository.latest_published_at()
+            if mode == "Expand":
+                published_after = repository.latest_published_at()
+            else:
+                published_before = repository.earliest_published_at()
         new_records = []
         quota_exceeded = False
         with st.spinner("Downloading transcripts..."):
@@ -166,10 +172,10 @@ if st.session_state.credentials:
                 videos = get_my_videos(
                     st.session_state.credentials,
                     None if fetch_all_videos else int(number_of_videos),
-                    published_after=latest_published,
+                    published_after=published_after,
+                    published_before=published_before,
                     service=service,
                     channel_id=selected_channel.get("channel_id"),
-                    uploads_playlist_id=uploads_playlist_id,
                 )
             except HttpError as exc:
                 message = ""

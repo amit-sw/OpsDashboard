@@ -60,6 +60,25 @@ class _FakePlaylistItems:
         return _FakePlaylistItemsInvoker(self, params)
 
 
+class _FakeSearchInvoker:
+    def __init__(self, parent, params):
+        self._parent = parent
+        self._params = params
+
+    def execute(self):
+        self._parent.calls.append(self._params)
+        return self._parent.responses.pop(0)
+
+
+class _FakeSearch:
+    def __init__(self, responses):
+        self.responses = list(responses)
+        self.calls = []
+
+    def list(self, **params):
+        return _FakeSearchInvoker(self, params)
+
+
 class _FakeChannels:
     def __init__(self, response):
         self.response = response
@@ -84,13 +103,13 @@ class _FakeCaptions:
 
 
 class _FakeYouTubeService:
-    def __init__(self, playlist_responses, caption_response, channels_response):
-        self._playlist_items = _FakePlaylistItems(playlist_responses)
+    def __init__(self, search_responses, caption_response, channels_response):
+        self._search = _FakeSearch(search_responses)
         self._captions = _FakeCaptions(caption_response)
         self._channels = _FakeChannels(channels_response)
 
-    def playlistItems(self):
-        return self._playlist_items
+    def search(self):
+        return self._search
 
     def captions(self):
         return self._captions
@@ -169,8 +188,8 @@ def test_get_my_videos_paginates_and_sorts(monkeypatch):
         {
             "items": [
                 {
-                    "contentDetails": {"videoId": "b", "videoPublishedAt": "2024-01-02T00:00:00Z"},
-                    "snippet": {"title": "Two"},
+                    "id": {"kind": "youtube#video", "videoId": "b"},
+                    "snippet": {"title": "Two", "publishedAt": "2024-01-02T00:00:00Z"},
                 },
             ],
             "nextPageToken": "TOKEN",
@@ -178,12 +197,12 @@ def test_get_my_videos_paginates_and_sorts(monkeypatch):
         {
             "items": [
                 {
-                    "contentDetails": {"videoId": "c", "videoPublishedAt": "2024-01-03T00:00:00Z"},
-                    "snippet": {"title": "Three"},
+                    "id": {"kind": "youtube#video", "videoId": "c"},
+                    "snippet": {"title": "Three", "publishedAt": "2024-01-03T00:00:00Z"},
                 },
                 {
-                    "contentDetails": {"videoId": "a", "videoPublishedAt": "2024-01-01T00:00:00Z"},
-                    "snippet": {"title": "One"},
+                    "id": {"kind": "youtube#video", "videoId": "a"},
+                    "snippet": {"title": "One", "publishedAt": "2024-01-01T00:00:00Z"},
                 },
             ],
         },
@@ -198,7 +217,7 @@ def test_get_my_videos_paginates_and_sorts(monkeypatch):
         ]
     }
     service = _FakeYouTubeService(
-        playlist_responses=responses,
+        search_responses=responses,
         caption_response={"items": []},
         channels_response=channel_payload,
     )
@@ -207,7 +226,7 @@ def test_get_my_videos_paginates_and_sorts(monkeypatch):
     videos = youtube_private_utils.get_my_videos("creds", max_results=3, published_after="2024-01-01T00:00:00Z")
 
     assert [v["video_id"] for v in videos] == ["a", "b", "c"]
-    assert [call["playlistId"] for call in service.playlistItems().calls] == ["UPLOADS", "UPLOADS"]
+    assert [call["channelId"] for call in service.search().calls] == ["channel-1", "channel-1"]
     assert service.channels().calls[0]["mine"] is True
 
 
@@ -216,12 +235,12 @@ def test_get_my_videos_accepts_datetime(monkeypatch):
         {
             "items": [
                 {
-                    "contentDetails": {"videoId": "keep", "videoPublishedAt": "2024-01-02T00:00:00Z"},
-                    "snippet": {"title": "Keep"},
+                    "id": {"kind": "youtube#video", "videoId": "keep"},
+                    "snippet": {"title": "Keep", "publishedAt": "2024-01-02T00:00:00Z"},
                 },
                 {
-                    "contentDetails": {"videoId": "skip", "videoPublishedAt": "2023-12-31T23:00:00Z"},
-                    "snippet": {"title": "Skip"},
+                    "id": {"kind": "youtube#video", "videoId": "skip"},
+                    "snippet": {"title": "Skip", "publishedAt": "2023-12-31T23:00:00Z"},
                 },
             ],
         }
@@ -236,7 +255,7 @@ def test_get_my_videos_accepts_datetime(monkeypatch):
         ]
     }
     service = _FakeYouTubeService(
-        playlist_responses=responses,
+        search_responses=responses,
         caption_response={"items": []},
         channels_response=channel_payload,
     )
@@ -244,7 +263,7 @@ def test_get_my_videos_accepts_datetime(monkeypatch):
 
     videos = youtube_private_utils.get_my_videos(
         "creds",
-        max_results=1,
+        max_results=2,
         published_after=datetime(2024, 1, 1, tzinfo=timezone.utc),
     )
 
@@ -256,12 +275,12 @@ def test_get_my_videos_normalizes_iso_strings(monkeypatch):
         {
             "items": [
                 {
-                    "contentDetails": {"videoId": "keep", "videoPublishedAt": "2024-01-01T00:00:00Z"},
-                    "snippet": {"title": "Keep"},
+                    "id": {"kind": "youtube#video", "videoId": "keep"},
+                    "snippet": {"title": "Keep", "publishedAt": "2024-01-01T00:00:00Z"},
                 },
                 {
-                    "contentDetails": {"videoId": "skip", "videoPublishedAt": "2023-12-31T23:59:59Z"},
-                    "snippet": {"title": "Skip"},
+                    "id": {"kind": "youtube#video", "videoId": "skip"},
+                    "snippet": {"title": "Skip", "publishedAt": "2023-12-31T23:59:59Z"},
                 },
             ],
         }
@@ -276,7 +295,7 @@ def test_get_my_videos_normalizes_iso_strings(monkeypatch):
         ]
     }
     service = _FakeYouTubeService(
-        playlist_responses=responses,
+        search_responses=responses,
         caption_response={"items": []},
         channels_response=channel_payload,
     )
@@ -284,7 +303,7 @@ def test_get_my_videos_normalizes_iso_strings(monkeypatch):
 
     videos = youtube_private_utils.get_my_videos(
         "creds",
-        max_results=1,
+        max_results=2,
         published_after="2024-01-01T00:00:00+00:00",
     )
 
@@ -308,7 +327,7 @@ def test_list_my_channels_returns_expected_shape():
         ]
     }
     service = _FakeYouTubeService(
-        playlist_responses=responses,
+        search_responses=responses,
         caption_response={"items": []},
         channels_response=channel_payload,
     )
@@ -319,20 +338,20 @@ def test_list_my_channels_returns_expected_shape():
     assert channels[1]["uploads_playlist_id"] == "UPLOADS2"
 
 
-def test_get_my_videos_respects_explicit_playlist(monkeypatch):
+def test_get_my_videos_respects_explicit_channel(monkeypatch):
     responses = [
         {
             "items": [
                 {
-                    "contentDetails": {"videoId": "x", "videoPublishedAt": "2024-01-02T00:00:00Z"},
-                    "snippet": {"title": "X"},
+                    "id": {"kind": "youtube#video", "videoId": "x"},
+                    "snippet": {"title": "X", "publishedAt": "2024-01-02T00:00:00Z"},
                 }
             ]
         }
     ]
     channel_payload = {"items": []}
     service = _FakeYouTubeService(
-        playlist_responses=responses,
+        search_responses=responses,
         caption_response={"items": []},
         channels_response=channel_payload,
     )
@@ -342,10 +361,10 @@ def test_get_my_videos_respects_explicit_playlist(monkeypatch):
         "creds",
         max_results=1,
         published_after=None,
-        uploads_playlist_id="UPLOADS",
+        channel_id="channel-x",
     )
 
-    assert [call["playlistId"] for call in service.playlistItems().calls] == ["UPLOADS"]
+    assert [call["channelId"] for call in service.search().calls] == ["channel-x"]
 
 
 def test_get_transcript_segments_uses_caption_download(monkeypatch):
@@ -355,7 +374,7 @@ def test_get_transcript_segments_uses_caption_download(monkeypatch):
         ]
     }
     service = _FakeYouTubeService(
-        playlist_responses=[{"items": []}],
+        search_responses=[{"items": []}],
         caption_response=caption_response,
         channels_response={"items": []},
     )
@@ -375,7 +394,7 @@ def test_get_transcript_segments_uses_caption_download(monkeypatch):
 
 def test_get_transcript_segments_raises_when_missing_caption(monkeypatch):
     service = _FakeYouTubeService(
-        playlist_responses=[{"items": []}],
+        search_responses=[{"items": []}],
         caption_response={"items": []},
         channels_response={"items": []},
     )
@@ -386,7 +405,7 @@ def test_get_transcript_segments_raises_when_missing_caption(monkeypatch):
 
 def test_get_transcript_segments_reports_insufficient_permissions(monkeypatch):
     service = _FakeYouTubeService(
-        playlist_responses=[{"items": []}],
+        search_responses=[{"items": []}],
         caption_response={"items": []},
         channels_response={"items": []},
     )
@@ -418,7 +437,7 @@ def test_get_transcript_returns_error_message(monkeypatch):
     text = youtube_private_utils.get_transcript(
         "video123",
         service=_FakeYouTubeService(
-            playlist_responses=[],
+            search_responses=[],
             caption_response={"items": []},
             channels_response={"items": []},
         ),
