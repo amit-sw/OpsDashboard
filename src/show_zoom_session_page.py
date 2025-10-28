@@ -58,10 +58,10 @@ def get_answers_one_transcript(transcript: str):
         user_result = response.content
     elapsed = time.perf_counter() - start
     duration = f"{elapsed*1000:.0f} ms" if elapsed < 1 else f"{elapsed:.2f} s"
-    st.sidebar.write(f"LLM call took {duration}")
-    return user_result
+    print(f"DEBUG goat: LLM call took {duration}")
+    return user_result, duration
     
-
+@st.dialog("Session Summary")
 def handle_session_summary(session_summary):   
     parsed_data = None
     for i in range(6):  # up to 6 attempts
@@ -134,29 +134,39 @@ def handle_session_summary(session_summary):
             st.subheader(direction.get("title", "N/A"))
             st.write(direction.get("summary", ""))
 
+@st.dialog("Raw Transcript")
+def show_raw_transcript(transcript: str):
+    st.code(transcript, language="text")
+    
+@st.dialog("Generate Answers")
+def generate_answers(transcript: str):
+    rsp,duration=get_answers_one_transcript(transcript)
+    st.write("### LLM Generated Summary")
+    st.write(rsp)
+    print(f"DEBUG ga: LLM call took {duration}")
+    st.session_state['duration'] = duration
+
 def show_session_information(session_data):
-    with st.sidebar.expander("Session Information"):
-        st.json(session_data)
+    #with st.sidebar.expander("Session Information"):
+    #    st.json(session_data)
     title=session_data.get("topic", "N/A")
     st.header(f"Zoom Session Details: {title}")
     with st.sidebar.expander("Youtube link"):
         yt_url = session_data.get("youtube_link", "N/A")
         st.write(f"{yt_url}")
-    with st.sidebar.expander("Zoom Transcript"):
+    if st.sidebar.button("Zoom Transcript"):
         transcript = session_data.get("transcript", "N/A")
-        st.code(transcript, height=100, language="text")
-        
-    with st.expander("Pre-generated Session Summary"):
-        try:
-            session_summary = session_data.get("session_summary", "N/A")
-            handle_session_summary(session_summary.strip())
-        except Exception as e:
-            st.error(f"An error occurred while parsing session summary: {e}")
-    # New LLM query on transcript
-    transcript = session_data.get("transcript", "N/A")
-    rsp=get_answers_one_transcript(transcript)
-    st.write("### LLM Generated Summary")
-    st.write(rsp)
+        show_raw_transcript(transcript)
+    
+    if st.sidebar.button("Pre-generated Summary"):
+        session_summary = session_data.get("session_summary", "N/A")
+        handle_session_summary(session_summary.strip())         
+    if st.sidebar.button("Generate answers"):
+        transcript = session_data.get("transcript", "N/A")
+        generate_answers(transcript)
+        duration = st.session_state.get('duration', 'N/A')
+        print(f"DEBUG SSI: LLM call took {duration}")
+        st.sidebar.write(f"LLM call took {duration}")
     
 def show_zoom_detail_page():
     session_id = st.query_params.get("q")
