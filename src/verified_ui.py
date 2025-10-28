@@ -13,6 +13,7 @@ from src.show_students_page import show_students_page
 from src.show_student_email_calendar import show_student_email_calendar
 from src.show_gmail_creds_page import show_gmail_creds_page
 from src.show_search_page import show_search_page
+from src.show_zoom_session_page import show_zoom_session_page, show_zoom_detail_page
 from src.show_instructors_page import show_instructors_page
 from src.show_gmail_fetch_control import show_gmail_fetch_control
     
@@ -53,6 +54,10 @@ def show_ui_core(user):
         "Search": [
             st.Page(show_search_page, title="Email search"),
         ],
+        "Past Sessions": [
+            st.Page(show_zoom_session_page, title="Sessions"),
+            st.Page(show_zoom_detail_page, title="Session Details"),
+        ],
 
     }
 
@@ -79,6 +84,10 @@ def show_ui_superadmin(user):
         "Super-Search": [
             st.Page(show_search_page, title="Email search"),
         ],
+        "Past Sessions": [
+            st.Page(show_zoom_session_page, title="Sessions"),
+            st.Page(show_zoom_detail_page, title="Session Details"),
+        ],
     }
     pg = st.navigation(pages, position="top")
     try:
@@ -101,6 +110,10 @@ def show_ui_admin(user):
             st.Page(show_search_page, title="Email search"),
             #st.Page(show_instructors_page, title="Instructors"),
             st.Page(show_gmail_fetch_control, title="GMail Fetch"),
+        ],
+        "Past Sessions": [
+            st.Page(show_zoom_session_page, title="Sessions"),
+            st.Page(show_zoom_detail_page, title="Session Details"),
         ],
 
     }

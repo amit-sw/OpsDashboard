@@ -175,3 +175,65 @@ class SupabaseClient:
         response = self.supabase.table("gmail_message_index").select("id, thread_id, internal_ms").eq("ymd", ymd).order("internal_ms", desc=False).execute()
         ids=response.data or []
         return ids
+    
+#
+# For YT video Prompt question answering system
+#
+
+    def insert_yt_video_records(self, rows):
+        try:
+            response = self.supabase.table("yt_videos").insert(rows).execute()
+            return response.data or []
+        except Exception as e:
+            print(f"Error creating instructor: {e}")
+            return []
+        
+    def insert_yt_video_qna(self, rows):
+        try:
+            response = self.supabase.table("yt_video_qna").insert(rows).execute()
+            return response.data or []
+        except Exception as e:
+            print(f"Error creating instructor: {e}")
+            return []
+        
+    def insert_yt_prompt(self, rows):
+        try:
+            response = self.supabase.table("yt_prompt").insert(rows).execute()
+            return response.data or []
+        except Exception as e:
+            print(f"Error creating instructor: {e}")
+            return []
+        
+    def get_yt_video_records(self, video_id):
+        try:
+            response = self.supabase.table('yt_videos').select('*').eq('video_id', video_id).execute()
+            return response.data or []
+        except Exception as e:
+            print(f"Error fetching YT Videos from database: {e}")
+            return None
+        
+    def get_yt_video_qna(self, video_id):
+        try:
+            response = self.supabase.table('yt_qna').select('*').eq('video_id', video_id).execute()
+            return response.data or []
+        except Exception as e:
+            print(f"Error fetching YT Q&A from database: {e}")
+            return None
+        
+    def get_yt_prompts(self, task_id):
+        try:
+            response = self.supabase.table('yt_prompts').select('*').eq('task_id', task_id).execute()
+            return response.data or []
+        except Exception as e:
+            print(f"Error fetching YT Prompts from database: {e}")
+            return None
+        
+    def get_yt_tasks(self):
+        try:
+            response = self.supabase.table('yt_tasks').select('*').execute()
+            if response.data:
+                return response.data
+            return None
+        except Exception as e:
+            print(f"Error fetching YT Tasks from database: {e}")
+            return None

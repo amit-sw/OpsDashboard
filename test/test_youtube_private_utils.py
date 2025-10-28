@@ -189,7 +189,11 @@ def test_get_my_videos_paginates_and_sorts(monkeypatch):
             "items": [
                 {
                     "id": {"kind": "youtube#video", "videoId": "b"},
-                    "snippet": {"title": "Two", "publishedAt": "2024-01-02T00:00:00Z"},
+                    "snippet": {
+                        "channelId": "channel-1",
+                        "title": "Two",
+                        "publishedAt": "2024-01-02T00:00:00Z",
+                    },
                 },
             ],
             "nextPageToken": "TOKEN",
@@ -198,11 +202,19 @@ def test_get_my_videos_paginates_and_sorts(monkeypatch):
             "items": [
                 {
                     "id": {"kind": "youtube#video", "videoId": "c"},
-                    "snippet": {"title": "Three", "publishedAt": "2024-01-03T00:00:00Z"},
+                    "snippet": {
+                        "channelId": "channel-1",
+                        "title": "Three",
+                        "publishedAt": "2024-01-03T00:00:00Z",
+                    },
                 },
                 {
                     "id": {"kind": "youtube#video", "videoId": "a"},
-                    "snippet": {"title": "One", "publishedAt": "2024-01-01T00:00:00Z"},
+                    "snippet": {
+                        "channelId": "channel-1",
+                        "title": "One",
+                        "publishedAt": "2024-01-01T00:00:00Z",
+                    },
                 },
             ],
         },
@@ -226,7 +238,8 @@ def test_get_my_videos_paginates_and_sorts(monkeypatch):
     videos = youtube_private_utils.get_my_videos("creds", max_results=3, published_after="2024-01-01T00:00:00Z")
 
     assert [v["video_id"] for v in videos] == ["a", "b", "c"]
-    assert [call["channelId"] for call in service.search().calls] == ["channel-1", "channel-1"]
+    assert all(call.get("forMine") for call in service.search().calls)
+    assert all("channelId" not in call for call in service.search().calls)
     assert service.channels().calls[0]["mine"] is True
 
 
@@ -236,11 +249,19 @@ def test_get_my_videos_accepts_datetime(monkeypatch):
             "items": [
                 {
                     "id": {"kind": "youtube#video", "videoId": "keep"},
-                    "snippet": {"title": "Keep", "publishedAt": "2024-01-02T00:00:00Z"},
+                    "snippet": {
+                        "channelId": "channel-1",
+                        "title": "Keep",
+                        "publishedAt": "2024-01-02T00:00:00Z",
+                    },
                 },
                 {
                     "id": {"kind": "youtube#video", "videoId": "skip"},
-                    "snippet": {"title": "Skip", "publishedAt": "2023-12-31T23:00:00Z"},
+                    "snippet": {
+                        "channelId": "channel-1",
+                        "title": "Skip",
+                        "publishedAt": "2023-12-31T23:00:00Z",
+                    },
                 },
             ],
         }
@@ -276,11 +297,19 @@ def test_get_my_videos_normalizes_iso_strings(monkeypatch):
             "items": [
                 {
                     "id": {"kind": "youtube#video", "videoId": "keep"},
-                    "snippet": {"title": "Keep", "publishedAt": "2024-01-01T00:00:00Z"},
+                    "snippet": {
+                        "channelId": "channel-1",
+                        "title": "Keep",
+                        "publishedAt": "2024-01-01T00:00:00Z",
+                    },
                 },
                 {
                     "id": {"kind": "youtube#video", "videoId": "skip"},
-                    "snippet": {"title": "Skip", "publishedAt": "2023-12-31T23:59:59Z"},
+                    "snippet": {
+                        "channelId": "channel-1",
+                        "title": "Skip",
+                        "publishedAt": "2023-12-31T23:59:59Z",
+                    },
                 },
             ],
         }
@@ -344,7 +373,19 @@ def test_get_my_videos_respects_explicit_channel(monkeypatch):
             "items": [
                 {
                     "id": {"kind": "youtube#video", "videoId": "x"},
-                    "snippet": {"title": "X", "publishedAt": "2024-01-02T00:00:00Z"},
+                    "snippet": {
+                        "channelId": "channel-x",
+                        "title": "X",
+                        "publishedAt": "2024-01-02T00:00:00Z",
+                    },
+                },
+                {
+                    "id": {"kind": "youtube#video", "videoId": "y"},
+                    "snippet": {
+                        "channelId": "channel-y",
+                        "title": "Y",
+                        "publishedAt": "2024-01-03T00:00:00Z",
+                    },
                 }
             ]
         }
@@ -364,7 +405,8 @@ def test_get_my_videos_respects_explicit_channel(monkeypatch):
         channel_id="channel-x",
     )
 
-    assert [call["channelId"] for call in service.search().calls] == ["channel-x"]
+    assert [v["video_id"] for v in videos] == ["x"]
+    assert all(call.get("forMine") for call in service.search().calls)
 
 
 def test_get_transcript_segments_uses_caption_download(monkeypatch):

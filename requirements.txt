@@ -9,9 +9,16 @@ google-api-python-client
 google-auth-httplib2
 google-auth-oauthlib
 
+langchain-core
 langchain-openai
 langsmith
 
 atlassian-python-api
 markdownify
 posthog
+
+youtube-transcript-api
+
+markitdown[all]
+pytest
+

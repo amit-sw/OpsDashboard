@@ -1,6 +1,7 @@
 from src.core_utils import (
     normalize_query_value,
     parse_srt,
+    pdf_bytes_to_text,
     transcript_segments_to_text,
 )
 
@@ -39,3 +40,28 @@ def test_parse_srt_converts_to_segments():
     assert segments[0]["duration"] == 2.0
     assert segments[0]["text"] == "Hello world"
     assert segments[1]["end"] == 5.0
+
+
+def test_pdf_bytes_to_text_returns_empty_for_blank():
+    assert pdf_bytes_to_text(b"") == ""
+
+
+def test_pdf_bytes_to_text_uses_markitdown(monkeypatch):
+    captured = {}
+
+    class DummyConverter:
+        def __init__(self, enable_plugins=True):
+            captured["enable_plugins"] = enable_plugins
+
+        def convert(self, stream):
+            captured["payload"] = stream.read()
+
+            class Result:
+                text_content = "converted"
+
+            return Result()
+
+    monkeypatch.setattr("src.core_utils.MarkItDown", DummyConverter)
+    assert pdf_bytes_to_text(b"pdf-bytes") == "converted"
+    assert captured["enable_plugins"] is True
+    assert captured["payload"] == b"pdf-bytes"

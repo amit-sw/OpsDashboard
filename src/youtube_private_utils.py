@@ -329,7 +329,6 @@ def _search_videos(
     collected: List[Dict[str, Any]] = []
     params = {
         "part": "snippet",
-        "channelId": channel_id,
         "type": "video",
         "order": "date",
         "maxResults": 50,
@@ -341,6 +340,9 @@ def _search_videos(
         params["publishedBefore"] = published_before
     for response in _search_pages(service, **params):
         for item in response.get("items", []):
+            snippet = item.get("snippet", {})
+            if channel_id and snippet.get("channelId") != channel_id:
+                continue
             video = _search_item_to_video(item)
             if not video:
                 continue

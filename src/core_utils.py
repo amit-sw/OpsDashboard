@@ -1,5 +1,8 @@
 import re
+from io import BytesIO
 from typing import Any, Iterable, Mapping, Optional, Sequence
+
+from markitdown import MarkItDown
 
 def normalize_query_value(value: Any) -> Optional[str]:
     """Return a single string value from Streamlit query parameters."""
@@ -65,3 +68,12 @@ def parse_srt(srt_text: str) -> list[dict[str, Any]]:
             }
         )
     return segments
+
+
+def pdf_bytes_to_text(pdf_bytes: bytes) -> str:
+    """Return extracted text from raw PDF bytes."""
+    if not pdf_bytes:
+        return ""
+    converter = MarkItDown(enable_plugins=True)
+    result = converter.convert(BytesIO(pdf_bytes))
+    return result.text_content or ""
