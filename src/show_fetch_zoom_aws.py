@@ -80,7 +80,9 @@ def show_fetch_zoom_aws():
     
     today = datetime.date.today()
     last_week = today - datetime.timedelta(days=7)
-    d=st.date_input("Pick another date", value=(last_week, today))
+    yesterday = today - datetime.timedelta(days=1)
+    tomorrow = today + datetime.timedelta(days=1)
+    d=st.date_input("Pick another date", value=(yesterday, tomorrow))
     if len(d)==2:
         start_date=d[0]
         end_date=d[1]

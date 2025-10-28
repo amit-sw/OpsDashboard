@@ -175,6 +175,25 @@ class SupabaseClient:
         response = self.supabase.table("gmail_message_index").select("id, thread_id, internal_ms").eq("ymd", ymd).order("internal_ms", desc=False).execute()
         ids=response.data or []
         return ids
+#
+# For downnload zoom session information from AWS
+#
+    def create_zoom_session(self, params):
+        try:
+            response = self.supabase.table('zoom_sessions').insert(params).execute()
+            #print(f"DEBUG: Created zoom session: {response.data}")
+            return response.data or []
+        except Exception as e:
+            print(f"Error creating instructor: {e}")
+            return []
+        
+    def get_zoom_session(self, session_id):
+        try:
+            response = self.supabase.table('zoom_sessions').select('*').eq('session_id', session_id).execute()
+            return response.data or []
+        except Exception as e:
+            print(f"Error creating instructor: {e}")
+            return []
     
 #
 # For YT video Prompt question answering system

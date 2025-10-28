@@ -16,6 +16,7 @@ from src.show_search_page import show_search_page
 from src.show_zoom_session_page import show_zoom_session_page, show_zoom_detail_page
 from src.show_instructors_page import show_instructors_page
 from src.show_gmail_fetch_control import show_gmail_fetch_control
+from src.show_fetch_zoom_aws import show_fetch_zoom_aws
     
 def show_events_all():
     st.title("Events all page")
@@ -114,6 +115,7 @@ def show_ui_admin(user):
         "Past Sessions": [
             st.Page(show_zoom_session_page, title="Sessions"),
             st.Page(show_zoom_detail_page, title="Session Details"),
+            st.Page(show_fetch_zoom_aws, title="Fetch AWS"),
         ],
 
     }
