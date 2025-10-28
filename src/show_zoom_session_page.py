@@ -8,6 +8,7 @@ import time
 import pandas as pd
 
 from utils.supabase_integration import SupabaseClient
+from src.show_chat_transcript import start_chat
 
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage
@@ -150,7 +151,9 @@ def show_session_information(session_data):
     #with st.sidebar.expander("Session Information"):
     #    st.json(session_data)
     title=session_data.get("topic", "N/A")
-    st.header(f"Zoom Session Details: {title}")
+    date_str=session_data.get("date", "N/A")
+    st.subheader(f"Zoom Session Chat: {title} on {date_str}")
+    transcript = session_data.get("transcript", "N/A")
     with st.sidebar.expander("Youtube link"):
         yt_url = session_data.get("youtube_link", "N/A")
         st.write(f"{yt_url}")
@@ -162,11 +165,11 @@ def show_session_information(session_data):
         session_summary = session_data.get("session_summary", "N/A")
         handle_session_summary(session_summary.strip())         
     if st.sidebar.button("Generate answers"):
-        transcript = session_data.get("transcript", "N/A")
         generate_answers(transcript)
         duration = st.session_state.get('duration', 'N/A')
         print(f"DEBUG SSI: LLM call took {duration}")
         st.sidebar.write(f"LLM call took {duration}")
+    start_chat(transcript)
     
 def show_zoom_detail_page():
     session_id = st.query_params.get("q")
