@@ -205,7 +205,7 @@ def start_chat(transcript="",existing_qna=None):
                     #restore_conv_history_to_ui(conv_id, r)
     
     for qna in existing_qna or []:
-        print(f"Addding to chat history: {qna['question_text']}, {qna['response_content']}")
+        #print(f"Addding to chat history: {qna['question_text']}, {qna['response_content']}")
         with st.chat_message("user"):
             st.write(qna['question_text'])
         with st.chat_message("assistant"):

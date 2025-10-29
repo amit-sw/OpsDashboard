@@ -139,7 +139,7 @@ def handle_session_summary(session_summary):
             st.subheader(direction.get("title", "N/A"))
             st.write(direction.get("summary", ""))
 
-@st.dialog("Raw Transcript")
+@st.dialog("Raw Transcript", width="large")
 def show_raw_transcript(transcript: str):
     st.code(transcript, language="text")
     
@@ -160,7 +160,7 @@ def refresh_qna_session(supabase_client, session_id):
     except Exception as e:
         st.error(f"An error occurred while refreshing QnA session: {e}")
     
-@st.dialog("Generate Answers: Multi-Query")
+@st.dialog("Generate Answers: Multi-Query", width="large")
 def generate_answers(supabase_client, session_id, transcript: str):
     model = os.getenv('LLM_MODEL', 'gpt-5-mini')
     refresh_qna_session(supabase_client, session_id)
@@ -174,6 +174,18 @@ def generate_answers(supabase_client, session_id, transcript: str):
             rsp=llm_request_response(supabase_client,model,session_id,transcript,topic,request)
             st.write(rsp)
         refresh_qna_session(supabase_client, session_id)
+        
+@st.dialog("Youtube Video", width="large")
+def show_youtube_video(youtube_link):
+    try:
+        print(f"DEBUG: Displaying YouTube video: {youtube_link}, with type {type(youtube_link)}")
+        clean_yt = youtube_link.replace('\\"', '"')
+        json_link = json.loads(clean_yt)
+        print(f"DEBUG: Displaying JT JSON video: {json_link}, with type {type(json_link)}")
+        st.video(json_link[0])
+    except Exception as e:
+        st.error(f"An error occurred while displaying the YouTube video: {e}")
+        print(f"An error occurred while displaying the YouTube video: {e}")
     
     #a=llm_request_response(supabase_client,model,session_id,transcript,topic,request)
     #rsp,duration=get_answers_one_transcript(transcript)
@@ -192,10 +204,11 @@ def show_session_information(supabase_client,session_data):
     transcript = session_data.get("transcript", "N/A")
     refresh_qna_session(supabase_client, session_id)
     
-    
-    with st.sidebar.expander("Youtube link"):
-        yt_url = session_data.get("youtube_link", "N/A")
-        st.write(f"{yt_url}")
+    yt_url = session_data.get("youtube_link", "N/A")
+    #with st.sidebar.expander("Youtube link"): 
+    #    st.write(f"{yt_url}")
+    if st.sidebar.button("Play Video"):
+        show_youtube_video(yt_url)
     if st.sidebar.button("Zoom Transcript"):
         transcript = session_data.get("transcript", "N/A")
         show_raw_transcript(transcript)
