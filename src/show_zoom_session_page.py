@@ -8,10 +8,14 @@ import time
 import pandas as pd
 
 from utils.supabase_integration import SupabaseClient
+from utils.utils_transcript_chat import llm_request_response
 from src.show_chat_transcript import start_chat
+
+from utils.prompts import question_prompts
 
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage
+
 
 def create_zoom_session_table(supabase_client: SupabaseClient):
     try:
@@ -139,21 +143,56 @@ def handle_session_summary(session_summary):
 def show_raw_transcript(transcript: str):
     st.code(transcript, language="text")
     
-@st.dialog("Generate Answers")
-def generate_answers(transcript: str):
+@st.dialog("Generate Answers : Single Query")
+def generate_answers_single_query(transcript: str):
     rsp,duration=get_answers_one_transcript(transcript)
     st.write("### LLM Generated Summary")
     st.write(rsp)
     print(f"DEBUG ga: LLM call took {duration}")
     st.session_state['duration'] = duration
+    
+def refresh_qna_session(supabase_client, session_id):
+    try:
+        response = supabase_client.get_session_qna(session_id)
+        if response:
+            st.session_state['qna_response'] = response
+        #print(f"DEBUG: Got QnA session for {session_id}, response: {response}")
+    except Exception as e:
+        st.error(f"An error occurred while refreshing QnA session: {e}")
+    
+@st.dialog("Generate Answers: Multi-Query")
+def generate_answers(supabase_client, session_id, transcript: str):
+    model = os.getenv('LLM_MODEL', 'gpt-5-mini')
+    refresh_qna_session(supabase_client, session_id)
+    if st.session_state.get('qna_response'):
+        st.info("QnA session already exists. Skipping generation.")
+        return
+    
+    with st.spinner("Generating answers ...", show_time=True):
+        for topic, request in question_prompts.items():
+            st.write(f"#### Topic: {topic}")
+            rsp=llm_request_response(supabase_client,model,session_id,transcript,topic,request)
+            st.write(rsp)
+        refresh_qna_session(supabase_client, session_id)
+    
+    #a=llm_request_response(supabase_client,model,session_id,transcript,topic,request)
+    #rsp,duration=get_answers_one_transcript(transcript)
+    #st.write("### LLM Generated Summary")
+    #st.write(rsp)
+    #print(f"DEBUG ga: LLM call took {duration}")
+    #st.session_state['duration'] = duration
 
-def show_session_information(session_data):
+def show_session_information(supabase_client,session_data):
     #with st.sidebar.expander("Session Information"):
     #    st.json(session_data)
     title=session_data.get("topic", "N/A")
     date_str=session_data.get("date", "N/A")
+    session_id=session_data.get("session_id", "N/A")
     st.subheader(f"Zoom Session Chat: {title} on {date_str}")
     transcript = session_data.get("transcript", "N/A")
+    refresh_qna_session(supabase_client, session_id)
+    
+    
     with st.sidebar.expander("Youtube link"):
         yt_url = session_data.get("youtube_link", "N/A")
         st.write(f"{yt_url}")
@@ -165,11 +204,11 @@ def show_session_information(session_data):
         session_summary = session_data.get("session_summary", "N/A")
         handle_session_summary(session_summary.strip())         
     if st.sidebar.button("Generate answers"):
-        generate_answers(transcript)
-        duration = st.session_state.get('duration', 'N/A')
-        print(f"DEBUG SSI: LLM call took {duration}")
-        st.sidebar.write(f"LLM call took {duration}")
-    start_chat(transcript)
+        generate_answers(supabase_client,session_id,transcript)
+        #duration = st.session_state.get('duration', 'N/A')
+        #print(f"DEBUG SSI: LLM call took {duration}")
+        #st.sidebar.write(f"LLM call took {duration}")
+    start_chat(transcript,st.session_state.get('qna_response'))
     
 def show_zoom_detail_page():
     session_id = st.query_params.get("q")
@@ -180,7 +219,7 @@ def show_zoom_detail_page():
         response = supabase_client.supabase.table("zoom_sessions").select("*").eq("session_id", session_id).execute()
         session_data = response.data[0] if response.data else None
         if session_data:
-            show_session_information(session_data)
+            show_session_information(supabase_client,session_data)
         else:
             st.error("Session not found.")
     except Exception as e:

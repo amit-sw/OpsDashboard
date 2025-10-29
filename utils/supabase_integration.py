@@ -194,6 +194,22 @@ class SupabaseClient:
         except Exception as e:
             print(f"Error creating instructor: {e}")
             return []
+        
+    def create_session_qna(self, rows):
+        try:
+            response = self.supabase.table("session_qna").insert(rows).execute()
+            return response.data or []
+        except Exception as e:
+            print(f"Error creating instructor: {e}")
+            return []
+        
+    def get_session_qna(self, session_id):
+        try:
+            response = self.supabase.table('session_qna').select('*').eq('session_id', session_id).execute()
+            return response.data or []
+        except Exception as e:
+            print(f"Error creating instructor: {e}")
+            return []
     
 #
 # For YT video Prompt question answering system

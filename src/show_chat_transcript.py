@@ -161,7 +161,7 @@ def simple_graph(model,system_prompt,transcript,history):
     response=llm.invoke(create_llm_msg(system_prompt,transcript,history))
     return response.content
 
-def start_chat(transcript=""):
+def start_chat(transcript="",existing_qna=None):
     st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Audiowide&display=swap');
@@ -203,7 +203,15 @@ def start_chat(transcript=""):
                     #st.error("to do")
                     r = conv['conv']
                     #restore_conv_history_to_ui(conv_id, r)
-
+    
+    for qna in existing_qna or []:
+        print(f"Addding to chat history: {qna['question_text']}, {qna['response_content']}")
+        with st.chat_message("user"):
+            st.write(qna['question_text'])
+        with st.chat_message("assistant"):
+            st.write(qna['response_content'])
+        #message_history.append(HumanMessage(content=qna['question_text']))
+        #message_history.append(AIMessage(content=qna['response_content'])) 
 
     for message in st.session_state.messages:
         if message["role"] != "system":
@@ -222,6 +230,9 @@ def start_chat(transcript=""):
             st.write(user_prompt.replace("$", "\\$"))
 
         message_history = []
+        
+
+        
         msgs = st.session_state.messages
     
         # Iterate through chat history, and based on the role (user or assistant) tag it as HumanMessage or AIMessage
