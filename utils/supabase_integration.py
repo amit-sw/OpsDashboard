@@ -211,6 +211,21 @@ class SupabaseClient:
             print(f"Error creating instructor: {e}")
             return []
     
+    def get_zoomsession_status_date(self, qna_status, date):
+        try:
+            response = self.supabase.table('zoom_sessions').select('*').eq('qna_status', qna_status).eq('date', date).execute()
+            return response.data or []
+        except Exception as e:
+            print(f"Error creating instructor: {e}")
+            return []
+        
+    def update_zoomsession_status(self, session_id,qna_status):
+        try:
+            response = self.supabase.table('zoom_sessions').update({'qna_status': qna_status}).eq('session_id', session_id).execute()
+            return response.data or []
+        except Exception as e:
+            print(f"Error creating instructor: {e}")
+            return []
 #
 # For YT video Prompt question answering system
 #

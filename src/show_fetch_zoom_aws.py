@@ -8,7 +8,13 @@ import boto3
 import pandas as pd
 
 from utils.utils_aws import setup_env_from_dict, save_to_supabase, fetch_s3_object, extract_field_value
-from utils.utils_aws import derive_column_names, decode_json_value, get_sql_query_date
+from utils.utils_aws import derive_column_names, decode_json_value, get_sql_query_aws_date 
+
+from utils.supabase_integration import SupabaseClient
+
+from utils.utils_transcript_chat import llm_request_response
+from utils.prompts import question_prompts
+    
 
 def process_one_record(rec, column_names, region):
     values = [extract_field_value(field) for field in rec]
@@ -47,8 +53,8 @@ def process_one_record(rec, column_names, region):
         #new_row["transcript_encoding"] = None
         #save_to_supabase(new_row)
         return new_row
-
-def process_one_day(date_str):
+    
+def process_one_day_fetch_selection(date_str):
     region=os.environ.get("REGION")
     cluster_arn=os.environ.get("CLUSTER_ARN")
     secret_arn=os.environ.get("SECRET_ARN")
@@ -56,7 +62,7 @@ def process_one_day(date_str):
     
     client = boto3.client("rds-data", region_name=region)
     
-    sql_qry = get_sql_query_date(date_str)
+    sql_qry = get_sql_query_aws_date(date_str)
     with st.sidebar.expander("SQL Query"):
         st.write(f"{sql_qry}")   
         
@@ -72,11 +78,45 @@ def process_one_day(date_str):
         rows.append(new_row)
     return rows
 
+def process_zoomsession_for_qna(supabase, row):
+    session_id=row.get("session_id")
+    transcript=row.get("transcript")
+    topic=row.get("topic") or "General"
+    model=os.environ.get("OPENAI_MODEL","gpt-5-mini")
+    try:
+        for q_topic, q_prompt in question_prompts.items():
+            print(f"Processing QnA for session {session_id}, topic: {q_topic}")
+            response_content=llm_request_response(supabase,model,session_id,transcript,topic,q_prompt)
+            #print(f"Response Content: {response_content}")
+        supabase.update_zoomsession_status(session_id, "QnA Completed")
+    except Exception as e:
+        print(f"ERROR processing ZoomSession for QnA for session {session_id}: {e}")
+
+def process_one_day_qna(supabase, date_str):
+    INITIAL_STATUS="Initial"
+    st.write(f"DEBUG: Fetching QnA for date: {date_str}")
+    rows=supabase.get_zoomsession_status_date(INITIAL_STATUS,date_str)
+    
+    st.write(f"DEBUG: Found {len(rows)} sessions with status {INITIAL_STATUS} for date {date_str}")
+    if rows:
+        st.json(rows)
+        for row in rows:
+            process_zoomsession_for_qna(supabase, row)
+    return rows
+        
+
+
 
 def show_fetch_zoom_aws():
     env_secrets=st.secrets.get("env")  
     if env_secrets:
         setup_env_from_dict(env_secrets)
+    
+    supabase = SupabaseClient(url=os.environ["SUPABASE_URL"], key=os.environ['SUPABASE_KEY'])
+        
+    options = ["Sessions", "QnA"]
+    fetch_selection = st.segmented_control("Fetch ", options, default='Sessions')
+    st.markdown(f"Your selected options: {fetch_selection}.")
     
     today = datetime.date.today()
     last_week = today - datetime.timedelta(days=7)
@@ -93,9 +133,14 @@ def show_fetch_zoom_aws():
             while current_date <= end_date:
                 date_str=current_date.strftime("%Y-%m-%d")
                 print(f"DEBUG: Selected date: {date_str}")
-                rows= process_one_day(date_str)
+                if fetch_selection=="Sessions":
+                    rows= process_one_day_fetch_selection(date_str)
+                if fetch_selection=="QnA":
+                    rows = process_one_day_qna(supabase, date_str)
+
+
                 df = pd.DataFrame(rows)
-                with st.expander(f"Data for {date_str}"):
+                with st.expander(f"Data {fetch_selection} for {date_str}"):
                     st.dataframe(df)
                 current_date += datetime.timedelta(days=1)
 

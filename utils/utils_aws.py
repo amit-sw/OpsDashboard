@@ -20,10 +20,10 @@ def get_sql_query():
     """
     return QUERY
 
-def get_sql_query_date(date_str):
+def get_sql_query_aws_date(date_str):
     date_start = f"{date_str} 00:00:00"
     date_end = f"{date_str} 23:59:59"
-    print(f"DEBUG: date_start={date_start}, date_end={date_end}")
+    print(f"DEBUG: fetch-aws: date_start={date_start}, date_end={date_end}")
 
     QUERY = f"""
     SELECT session_id,project_id,instructor_names,youtube_link,session_summary,timestamp,date,time_zone,zoom_link,topic,transcript
