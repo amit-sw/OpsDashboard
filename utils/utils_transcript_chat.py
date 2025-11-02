@@ -17,7 +17,7 @@ def create_llm_msg(system_prompt,transcript,history):
 def llm_request_response(supabase,model,session_id,transcript,topic,request):
     llm = ChatOpenAI(model_name=model)
     request_messages=[HumanMessage(content=request)]
-    print(f"LRR Question: {request}")
+    #print(f"LRR Question: {request}")
     #print(f"##### System Prompt: {system_prompt}")
     #print(f"##### Transcript Length: {len(transcript)} characters")
     #print(f"##### Model: {model}")
