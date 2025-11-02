@@ -19,7 +19,7 @@ from langchain_core.messages import SystemMessage, HumanMessage
 
 def create_zoom_session_table(supabase_client: SupabaseClient):
     try:
-        response = supabase_client.supabase.table("zoom_sessions").select("topic,date,session_id").execute()
+        response = supabase_client.supabase.table("zoom_sessions").select("topic,date,session_id").order("date", desc=True).order("topic").execute()
         return response.data or []
     except Exception as e:
         st.error(f"An error occurred while fetching zoom sessions: {e}")

@@ -4,6 +4,8 @@ import os
 import base64
 import datetime
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
 import boto3
 import pandas as pd
 
@@ -100,8 +102,15 @@ def process_one_day_qna(supabase, date_str):
     st.write(f"DEBUG: Found {len(rows)} sessions with status {INITIAL_STATUS} for date {date_str}")
     if rows:
         st.json(rows)
-        for row in rows:
-            process_zoomsession_for_qna(supabase, row)
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            futures = [executor.submit(process_zoomsession_for_qna, supabase, row) for row in rows]
+            for future in as_completed(futures):
+                try:
+                    future.result()
+                except Exception as e:
+                    print(f"Error processing row: {e}")
+        #for row in rows:
+        #    process_zoomsession_for_qna(supabase, row)
     return rows
         
 
