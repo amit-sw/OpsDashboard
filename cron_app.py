@@ -108,7 +108,7 @@ def process_one_day_qna(supabase, date_str):
         #    process_zoomsession_for_qna(supabase, row)
     return rows
         
-def main_cron_processing(supabase_url, supabase_key, openai_model, openai_api_key, cronId, duration):
+def main_cron_processing(supabase_url, supabase_key, cronId, duration):
     supabase = SupabaseClient(url=supabase_url, key=supabase_key)
     
     end_date = datetime.date.today()+datetime.timedelta(days=1)
@@ -121,7 +121,7 @@ def main_cron_processing(supabase_url, supabase_key, openai_model, openai_api_ke
         if cronId=="Sessions":
             rows= process_one_day_fetch_selection(date_str)
         if cronId=="QnA":
-            rows = process_one_day_qna(supabase, openai_model, openai_api_key, date_str)
+            rows = process_one_day_qna(supabase, date_str)
 
         df = pd.DataFrame(rows)
         current_date += datetime.timedelta(days=1)
@@ -135,8 +135,8 @@ def main():
 
     duration=os.environ.get("duration","2")
     
-    main_cron_processing(supabase_url, supabase_key, openai_model, openai_api_key, "Sessions", duration)
-    main_cron_processing(supabase_url, supabase_key, openai_model, openai_api_key, "QnA", duration)
+    main_cron_processing(supabase_url, supabase_key, "Sessions", duration)
+    main_cron_processing(supabase_url, supabase_key, "QnA", duration)
     
 if __name__ == "__main__":
     main()
