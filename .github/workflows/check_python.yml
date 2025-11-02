@@ -20,19 +20,22 @@ jobs:
     env:
       
       # New AWS Secrets
-      AWS_SECRET_ARN: ${{ secrets.AWS_SECRET_ARN }}
-      AWS_DB_NAME: ${{ secrets.AWS_DB_NAME }}
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_CLUSTER_ARN: ${{ secrets.AWS_CLUSTER_ARN }}
+      AWS_DB_NAME: ${{ secrets.AWS_DB_NAME }}
+      AWS_REGION: ${{ secrets.AWS_REGION }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_SECRET_ARN: ${{ secrets.AWS_SECRET_ARN }}
+
+      # New LangChain Secrets
+      LANGCHAIN_API_KEY: ${{ secrets.LANGCHAIN_API_KEY }}
+      LANGCHAIN_ENDPOINT: ${{ secrets.LANGCHAIN_ENDPOINT }}
+      LANGCHAIN_PROJECT: ${{ secrets.LANGCHAIN_PROJECT }}
+      LANGCHAIN_TRACING_V2: ${{ secrets.LANGCHAIN_TRACING_V2 }} 
 
       # New OpenAI Secrets
       OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-
-      # New LangChain Secrets
-      LANGCHAIN_TRACING_V2: ${{ secrets.LANGCHAIN_TRACING_V2 }} 
-      LANGCHAIN_PROJECT: ${{ secrets.LANGCHAIN_PROJECT }}
-      LANGCHAIN_ENDPOINT: ${{ secrets.LANGCHAIN_ENDPOINT }}
 
       # New Supabase Secrets
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
