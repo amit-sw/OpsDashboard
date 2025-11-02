@@ -15,6 +15,7 @@ on:
 jobs:
   run-script:
     runs-on: ubuntu-latest
+    environment: OpsDashboard Secrets
 
     # These secrets will be available as environment variables for all steps
     env:
@@ -53,6 +54,14 @@ jobs:
       - name: 3. Install dependencies
         run: pip install -r requirements.txt
 
-      - name: 4. Run Python script
+      - name: 4. Verify required env vars
+        shell: bash
+        run: |
+          for var in SUPABASE_URL SUPABASE_KEY AWS_REGION AWS_CLUSTER_ARN AWS_SECRET_ARN AWS_DB_NAME OPENAI_API_KEY; do
+            test -n "${!var}" || { echo "::error::$var is empty"; exit 1; }
+          done
+
+
+      - name: 5. Run Python script
         # This script now has access to all env vars from the 'env:' block
         run: python cron_app.py
