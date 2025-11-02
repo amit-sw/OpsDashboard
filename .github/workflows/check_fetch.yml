@@ -1,14 +1,13 @@
-name: Check Streamlit App (Single-File Version)
+name: Check Streamlit App Fetch
 
 on:
   schedule:
-    - cron: '0 * * * *'   # Every hour
-  workflow_dispatch:      # Allow manual trigger from Actions tab
+    - cron: '0 * * * *'   # every hour
+  workflow_dispatch:      # manual trigger
 
 jobs:
   check-uptime:
     runs-on: ubuntu-latest
-
     steps:
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -17,8 +16,7 @@ jobs:
 
       - name: Check Streamlit app status
         run: |
-          node -e "
-            import fetch from 'node-fetch';
+          node --input-type=module -e "
             const url = 'https://aiclubops.streamlit.app/?cronId=Sessions&duration=2';
             (async () => {
               try {
@@ -35,3 +33,4 @@ jobs:
               }
             })();
           "
+
