@@ -15,9 +15,10 @@ on:
 jobs:
   run-script:
     runs-on: ubuntu-latest
+    environment: OpsDashboard Secrets
 
     # These secrets will be available as environment variables for all steps
-    env: OpsDashboard Secrets
+    env:
       
       # New AWS Secrets
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
