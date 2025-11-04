@@ -226,6 +226,26 @@ class SupabaseClient:
         except Exception as e:
             print(f"Error creating instructor: {e}")
             return []
+        
+#
+# For transcript token length related items
+#
+    def get_zoom_session_negative_tokenlength(self, threshold):
+        try:
+            response = self.supabase.table('zoom_sessions').select('*').lt('transcript_token_count', threshold).limit(1).execute()
+            return response.data or []
+        except Exception as e:
+            print(f"Error creating zoom-session-negative-response: {e}")
+            return []
+        
+    def update_zoom_session_tokenlength(self, id, token_length):
+        try:
+            response = self.supabase.table('zoom_sessions').update({'transcript_token_count': token_length}).eq('id', id).execute()
+            return response.data or []
+        except Exception as e:
+            print(f"Error updating zoom-session-negative-response: {e}")
+            return []
+
 #
 # For YT video Prompt question answering system
 #
