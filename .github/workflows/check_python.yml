@@ -42,6 +42,11 @@ jobs:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
 
+      # AgentMail Secrets
+      AGENTMAIL_API_KEY: ${{ secrets.AGENTMAIL_API_KEY }}
+      AGENTMAIL_FROM_ADDRESS: ${{ secrets.AGENTMAIL_FROM_ADDRESS }} 
+      AGENTMAIL_TO_ADDRESS: ${{ secrets.AGENTMAIL_TO_ADDRESS }}
+
     steps:
       - name: 1. Check out repository
         uses: actions/checkout@v4
