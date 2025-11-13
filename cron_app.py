@@ -1,4 +1,7 @@
 import os
+from dotenv import load_dotenv
+
+load_dotenv() 
 
 import base64
 import datetime
@@ -6,6 +9,8 @@ import pandas as pd
 
 import boto3
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+from agentmail import AgentMail
 
 from utils.utils_aws import save_to_supabase, fetch_s3_object, extract_field_value
 from utils.utils_aws import derive_column_names, decode_json_value, get_sql_query_aws_date 
@@ -75,17 +80,38 @@ def process_one_day_fetch_selection(date_str):
         rows.append(new_row)
     return rows
 
+def email_out(topic,response_list):
+    API_KEY=os.environ['AGENTMAIL_API_KEY']
+    FROM_ADDRESS=os.environ['AGENTMAIL_FROM_ADDRESS'] 
+    TO_ADDRESS=os.environ['AGENTMAIL_TO_ADDRESS'] 
+    client = AgentMail(api_key=API_KEY)
+    subject = f"ACSV Session Summary for {topic}"
+    text="\n\n".join([ f"TOPIC: {rsp['qt']}\n {rsp['rc']} " for rsp in response_list])
+    print(f"\n\nDEBUGGING: {subject=}, {text=}")
+    sent_message = client.inboxes.messages.send(
+        inbox_id = FROM_ADDRESS,
+        to = TO_ADDRESS,
+        labels=["session","bot","test"],
+        subject=subject,
+        text=text,
+        #html="<div dir=\"ltr\">Hello,<br /><br />I'm just testing..."
+    )
+    print(f"Message sent successfully with ID: {sent_message.message_id}")
+
 def process_zoomsession_for_qna(supabase, row):
     session_id=row.get("session_id")
     transcript=row.get("transcript")
     topic=row.get("topic") or "General"
     model=os.environ.get("OPENAI_MODEL","gpt-5-mini")
+    response_list=[]
     try:
         for q_topic, q_prompt in question_prompts.items():
             print(f"Processing QnA for session {session_id}, topic: {q_topic}")
             response_content=llm_request_response(supabase,model,session_id,transcript,topic,q_prompt)
             #print(f"Response Content: {response_content}")
+            response_list.append({"qt":q_topic,"rc":response_content})
         supabase.update_zoomsession_status(session_id, "QnA Completed")
+        email_out(topic,response_list)
     except Exception as e:
         print(f"ERROR processing ZoomSession for QnA for session {session_id}: {e}")
 
@@ -127,6 +153,8 @@ def main_cron_processing(supabase_url, supabase_key, cronId, duration):
         current_date += datetime.timedelta(days=1)
         
 def main():
+    for key, value in os.environ.items():
+        print(key, value)
     supabase_url = os.environ["SUPABASE_URL"]
     supabase_key=os.environ['SUPABASE_KEY']
     

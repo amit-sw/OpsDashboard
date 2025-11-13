@@ -24,3 +24,7 @@ youtube-transcript-api
 markitdown[all]
 pytest
 
+agentmail
+
+python-dotenv
+
