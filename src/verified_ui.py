@@ -17,9 +17,25 @@ from src.show_zoom_session_page import show_zoom_session_page, show_zoom_detail_
 from src.show_instructors_page import show_instructors_page
 from src.show_gmail_fetch_control import show_gmail_fetch_control
 from src.show_fetch_zoom_aws import show_fetch_zoom_aws
+from src.show_users_students import show_users_students
+
+from utils.process_gsheets import get_users_students
     
 def show_events_all():
     st.title("Events all page")
+    
+def set_student_list(user):
+    #st.title("User's students")
+    email = user.get('email')
+    service_account_info = st.secrets["gdrive_secrets"]
+    sheets_list=service_account_info.get("sheets")
+    df_students, df_persons, df_relations=get_users_students(email, service_account_info, sheets_list)
+    #with st.sidebar.expander("Persons"):
+    #    st.dataframe(df_persons)
+    #with st.sidebar.expander("Relationships"):
+    #    st.dataframe(df_relations)
+    st.session_state['student_list']=df_students
+    return df_students
 
 def show_sidebar_ui(user):
     name = user.get("name", "Unknown User")
@@ -44,6 +60,7 @@ def show_sidebar_ui(user):
 @traceable(run_type="tool")
 def show_ui_core(user):
     show_sidebar_ui(user)
+    set_student_list(user)
     
     pages = {
         "Students": [
@@ -73,6 +90,7 @@ def show_ui_core(user):
 @traceable(run_type="tool")    
 def show_ui_superadmin(user):
     show_sidebar_ui(user)
+    set_student_list(user)
     #st.title("Admin Panel")
     #st.write("This is the admin panel. More features coming soon!")
     pages = {
@@ -85,7 +103,7 @@ def show_ui_superadmin(user):
         "Super-Search": [
             st.Page(show_search_page, title="Email search"),
         ],
-        "Past Sessions": [
+        "Super - Past Sessions": [
             st.Page(show_zoom_session_page, title="Sessions"),
             st.Page(show_zoom_detail_page, title="Session Details"),
         ],
@@ -99,6 +117,7 @@ def show_ui_superadmin(user):
 @traceable(run_type="tool")    
 def show_ui_admin(user):
     show_sidebar_ui(user)
+    set_student_list(user)
     
     pages = {
         "Admin-Students": [
@@ -116,6 +135,7 @@ def show_ui_admin(user):
             st.Page(show_zoom_session_page, title="Sessions"),
             st.Page(show_zoom_detail_page, title="Session Details"),
             st.Page(show_fetch_zoom_aws, title="Fetch AWS"),
+            st.Page(show_users_students,title="User's students")
         ],
 
     }
