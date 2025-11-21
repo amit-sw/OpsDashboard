@@ -102,37 +102,43 @@ def get_info_gsheets(service_account_info, sheets_list):
     results = process_sheets(service_account_info, sheets_list)
     df_persons=pd.DataFrame()
     df_relations=pd.DataFrame()
+    df_sessions=pd.DataFrame()
     list_persons=results.get('persons')
     list_relations=results.get('relations')
+    list_sessions=results.get('sessions')
     if list_persons:
         df_persons=pd.DataFrame(list_persons[1:],columns=list_persons[0])
     if list_relations:
         df_relations=pd.DataFrame(list_relations[1:],columns=list_relations[0])
-    return df_persons, df_relations
+    if list_sessions:
+        df_sessions=pd.DataFrame(list_sessions[1:],columns=list_sessions[0])
+    return df_persons, df_relations, df_sessions
 
 def get_users_students(email, service_account_info, sheets_list):
 
-    df_persons,df_relations=get_info_gsheets(service_account_info, sheets_list)
+    df_persons,df_relations,df_sessions=get_info_gsheets(service_account_info, sheets_list)
 
     person_names = set(df_persons.loc[df_persons['Email'].fillna('').str.strip().str.lower() == email,'Name'].astype(str))
 
     if not person_names:
         #st.info(f"Logged in user {email=} not found in Persons table")
-        return None, df_persons,df_relations
+        return None, None, df_persons,df_relations, df_sessions
 
     related_rows = df_relations[df_relations['Person'].astype(str).isin(person_names)]
     student_names = set(related_rows['Student'].astype(str))
     if not student_names:
         #st.info(f"Logged in user {email=}, {person_names=} not found in relationship table")
-        return None, df_persons,df_relations
+        return None, None, df_persons,df_relations, df_sessions
 
     filtered_df = df_persons[df_persons['Name'].astype(str).isin(student_names)]
     if filtered_df.empty:
         #st.info("No matching persons for related IDs.")
-        return None, df_persons,df_relations
+        return None, None. df_persons,df_relations, df_sessions
     #st.success("Related persons")
+    
+    df_topic_list = df_sessions[df_sessions['Person'].astype(str).isin(student_names)]
 
-    return filtered_df, df_persons, df_relations
+    return filtered_df, df_topic_list, df_persons, df_relations, df_sessions
 
 
 def process_files(service_account_info):

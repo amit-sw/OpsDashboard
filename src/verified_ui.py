@@ -17,7 +17,7 @@ from src.show_zoom_session_page import show_zoom_session_page, show_zoom_detail_
 from src.show_instructors_page import show_instructors_page
 from src.show_gmail_fetch_control import show_gmail_fetch_control
 from src.show_fetch_zoom_aws import show_fetch_zoom_aws
-from src.show_users_students import show_users_students
+from src.show_users_students import show_users_students, show_users_student_details
 
 from utils.process_gsheets import get_users_students
     
@@ -29,12 +29,13 @@ def set_student_list(user):
     email = user.get('email')
     service_account_info = st.secrets["gdrive_secrets"]
     sheets_list=service_account_info.get("sheets")
-    df_students, df_persons, df_relations=get_users_students(email, service_account_info, sheets_list)
+    df_students, df_topic_list, df_persons, df_relations, df_sessions=get_users_students(email, service_account_info, sheets_list)
     #with st.sidebar.expander("Persons"):
     #    st.dataframe(df_persons)
     #with st.sidebar.expander("Relationships"):
     #    st.dataframe(df_relations)
     st.session_state['student_list']=df_students
+    st.session_state['topic_list']=df_topic_list
     return df_students
 
 def show_sidebar_ui(user):
@@ -63,6 +64,10 @@ def show_ui_core(user):
     set_student_list(user)
     
     pages = {
+        "User": [
+            st.Page(show_users_students,title="User's students"),
+            st.Page(show_users_student_details,title="User's student details"),
+        ],
         "Students": [
             st.Page(show_students_page, title="Students"),
         ],
@@ -120,6 +125,10 @@ def show_ui_admin(user):
     set_student_list(user)
     
     pages = {
+        "Admin-User": [
+            st.Page(show_users_students,title="User's students"),
+            st.Page(show_users_student_details,title="User's student details"),
+        ],
         "Admin-Students": [
             st.Page(show_students_page, title="Students"),
         ],
@@ -135,7 +144,7 @@ def show_ui_admin(user):
             st.Page(show_zoom_session_page, title="Sessions"),
             st.Page(show_zoom_detail_page, title="Session Details"),
             st.Page(show_fetch_zoom_aws, title="Fetch AWS"),
-            st.Page(show_users_students,title="User's students")
+            
         ],
 
     }
