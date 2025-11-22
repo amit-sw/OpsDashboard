@@ -33,7 +33,7 @@ def show_users_student_details():
     supabase_client=SupabaseClient(os.getenv('SUPABASE_URL'),os.getenv('SUPABASE_KEY'))
     #st.divider()
     df2=st.session_state.get('topic_list')
-    #st.dataframe(df2)
+    df2 = df2[df2['Person'] == student_name]
     topics = df2['Topic'].dropna().str.strip().tolist()
     session_table=create_topic_zoom_session_table(supabase_client,topics)
     df3 = pd.DataFrame(session_table)
