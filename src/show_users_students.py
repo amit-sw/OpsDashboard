@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 
 import os
+from datetime import datetime, timezone
 
 #import io
 #from google.oauth2 import service_account
@@ -28,10 +29,44 @@ def show_users_students():
 
     #st.dataframe(df)
     
+def events_to_df(events):
+    rows = []
+    for event in events:          # events = list of event dicts from the API
+        start_str = (
+            event.get("start", {}).get("dateTime")
+            or event.get("start", {}).get("date")
+        )
+        start_dt = pd.to_datetime(start_str)
+        rows.append(
+            {
+                "Topic": event.get("summary", ""),
+                "Meeting Date": start_dt.date(),
+                "Start Time": start_dt.time(),
+            }
+        )
+
+    df = pd.DataFrame(rows)
+
+    if df.empty:
+        st.info("No meetings found.")
+        return df, None, None
+    else:
+        combined = pd.to_datetime(df["Meeting Date"].astype(str) + " " + df["Start Time"].astype(str))
+        first_idx = combined.idxmin()
+        first_topic = df.loc[first_idx, "Topic"]
+        first_dt = combined.loc[first_idx].replace(tzinfo=timezone.utc)  # adjust tz if needed
+        days_until = (first_dt - datetime.now(timezone.utc)).days
+        return df,first_topic,days_until
+    
 def show_calendar_info(topics):
     calendar = CalendarClient(st.secrets.get('calendar'))
     events=calendar.get_events_for_topics(topics)
-    st.json(events)
+    #st.json(events)
+    df,topic,days_until=events_to_df(events)
+    if days_until:
+        st.divider()
+        st.title(f"In {days_until} days, meeting: {topic}")
+        st.dataframe(df.head(10), hide_index=True)
     
     
     
@@ -44,7 +79,7 @@ def show_past_session_details(topics):
     
 def show_users_student_details():
     student_name = st.query_params.get("q")
-    st.title(f"S Student: {student_name}")
+    st.title(f"Person: {student_name}")
     df=st.session_state.get('topic_list')
     df = df[df['Person'] == student_name]
     topics = df['Topic'].dropna().str.strip().tolist()
