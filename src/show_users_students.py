@@ -60,14 +60,15 @@ def events_to_df(events):
     
 def show_calendar_info(topics):
     calendar = CalendarClient(st.secrets.get('calendar'))
-    events=calendar.get_events_for_topics(topics)
+    events,all_events=calendar.get_events_for_topics(topics)
     #st.json(events)
     df,topic,days_until=events_to_df(events)
     if days_until:
         st.divider()
         st.title(f"In {days_until} days, meeting: {topic}")
         st.dataframe(df.head(10), hide_index=True)
-    
+    #with st.expander("All events"):
+    #    st.dataframe(all_events)
     
     
 def show_past_session_details(topics):

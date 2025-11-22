@@ -70,7 +70,7 @@ class CalendarClient:
                 event_summary=event['summary']
                 if event_summary in topics:
                     selected_events.append(event)
-            return selected_events
+            return selected_events, all_events
         except Exception as e:
             print(f"Error fetching events for topics {topics}: {e}")
             return None
