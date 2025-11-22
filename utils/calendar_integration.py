@@ -61,3 +61,16 @@ class CalendarClient:
             print(f"Error fetching events for emails: {e}")
             return {}
 
+    def get_events_for_topics(self, topics):
+        try:
+            all_events = self.get_calendar_events(future_only=True, max_days=30)
+            #st.write(f"First 10 events are: {all_events[:10]}")
+            selected_events=[]
+            for event in all_events:
+                event_summary=event['summary']
+                if event_summary in topics:
+                    selected_events.append(event)
+            return selected_events
+        except Exception as e:
+            print(f"Error fetching events for topics {topics}: {e}")
+            return None
