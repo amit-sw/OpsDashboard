@@ -176,10 +176,10 @@ def show_messages_in_ui(rows,max_rows=10):
 def search_ui(creds: Credentials, query_term=None) -> None:
     search_expression = " in:all newer_than:90d"
     if query_term:
-        words = query_term.split()
-        new_term=' OR '.join(words)
-        search_expression = query_term + search_expression
+        new_term=' OR '.join(query_term)
+        search_expression = new_term + search_expression
     st.subheader("Mail messages for Coordinator")
+    #print(f"Search UI: {query_term=}, {new_term=}, {search_expression=}")
     limit = st.sidebar.slider("Max results", min_value=100, max_value=1000, value=200, step=100)
     fetch_all = False
     q = st.text_input("Gmail search query", value=search_expression, label_visibility="hidden")
@@ -223,7 +223,8 @@ def show_search_page(query_term=None) -> None:
     creds = manager.credentials()
     
     if creds and creds.valid:
-        query_term = st.query_params.get("q")
+        if not query_term:
+            query_term = st.query_params.get("q")
         search_ui(creds,query_term=query_term)
         return
     else:

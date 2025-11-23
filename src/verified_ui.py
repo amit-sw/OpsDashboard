@@ -36,6 +36,8 @@ def set_student_list(user):
     #    st.dataframe(df_relations)
     st.session_state['student_list']=df_students
     st.session_state['topic_list']=df_topic_list
+    st.session_state['person_list']=df_persons
+    st.session_state['relation_list']=df_relations
     return df_students
 
 def show_sidebar_ui(user):

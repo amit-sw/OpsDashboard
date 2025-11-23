@@ -25,13 +25,13 @@ def json_google_sheet(sheets_service, file_id, cell_range=None):
 
 def read_google_sheet(sheets_service,file_id, name="Name not provided"):
     """Read values from a Google Sheet."""
-    print(f"\n🧮 Reading Google Sheet: {name}")
+    #print(f"\n🧮 Reading Google Sheet: {name}")
     sheets_data = json_google_sheet(sheets_service, file_id)
 
-    for sheet_name, rows in sheets_data.items():
-        print(f"\n-- {sheet_name} --")
-        for row in rows:
-            print(row)
+    #for sheet_name, rows in sheets_data.items():
+    #    print(f"\n-- {sheet_name} --")
+    #    for row in rows:
+    #        print(row)
     return sheets_data
 
 def read_google_slides(slides_service, file_id, name):

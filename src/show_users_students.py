@@ -10,7 +10,8 @@ from datetime import datetime, timezone
 #from googleapiclient.http import MediaIoBaseDownload
 
 from utils.supabase_integration import SupabaseClient
-from utils. calendar_integration import CalendarClient
+from utils.calendar_integration import CalendarClient
+from src.show_search_page import show_search_page
 
 def create_topic_zoom_session_table(supabase_client: SupabaseClient, topic_list: [str]):
     try:
@@ -70,14 +71,44 @@ def show_calendar_info(topics):
     #with st.expander("All events"):
     #    st.dataframe(all_events)
     
+def show_email_info(student_name):
+    st.divider()
+    #st.write("TO-DO Email information")
+    # 1. Get student email address
+    df1=st.session_state.get('student_list')
+    df2=st.session_state.get('relation_list')
+    df3=st.session_state.get('person_list')
+    #st.dataframe(df1)
+    #st.dataframe(df2)
+    #st.dataframe(df3)
+    df1 = df1[df1['Name'] == student_name]
+    student_emails=df1['Email'].tolist()
+    parent_rows = df2[(df2['Student'] == student_name) & (df2['Relationship'] == 'parent')]
+    parent_names=parent_rows['Person'].tolist()
+    #st.write(f"{student_emails=}, {parent_names=}")
+    parent_email_rows=df3[df3['Name'].isin(parent_names)]
+    parent_emails=parent_email_rows['Email'].tolist()
+    #st.write(f"{parent_emails=}")
+    combined_emails=student_emails+parent_emails
+    query_str=" OR ".join(combined_emails)
+    #st.write(f"{combined_emails=}, {query_str=}")
+    show_search_page(combined_emails)
+    
+    # 2. Get email of their parents
+    # Search by df_n["URL"]="/show_search_page?q="+df_n['student']+' OR '+df_n['all_emails']
+    
+    
     
 def show_past_session_details(topics):
     supabase_client=SupabaseClient(os.getenv('SUPABASE_URL'),os.getenv('SUPABASE_KEY'))
     session_table=create_topic_zoom_session_table(supabase_client,topics)
-    df3 = pd.DataFrame(session_table)
-    df3["URL"]="/show_zoom_detail_page?q="+df3['session_id']
-    st.dataframe(df3, column_config={"URL": st.column_config.LinkColumn("URL", display_text="Session details")}, hide_index=True)
-    
+    df = pd.DataFrame(session_table)
+    if df.empty:
+        st.warning("No past sessions seem")
+    else:
+        df["URL"]="/show_zoom_detail_page?q="+df['session_id']
+        st.dataframe(df, column_config={"URL": st.column_config.LinkColumn("URL", display_text="Session details")}, hide_index=True)
+        
 def show_users_student_details():
     student_name = st.query_params.get("q")
     st.title(f"Person: {student_name}")
@@ -86,3 +117,4 @@ def show_users_student_details():
     topics = df['Topic'].dropna().str.strip().tolist()
     show_past_session_details(topics)
     show_calendar_info(topics)
+    show_email_info(student_name)
