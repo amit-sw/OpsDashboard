@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 
+import math
 import os
 from datetime import datetime, timezone
 
@@ -71,7 +72,7 @@ def show_calendar_info(topics):
     #with st.expander("All events"):
     #    st.dataframe(all_events)
     
-def show_email_info(student_name):
+def show_email_info(student_name,days):
     st.divider()
     #st.write("TO-DO Email information")
     # 1. Get student email address
@@ -92,7 +93,7 @@ def show_email_info(student_name):
     combined_emails=student_emails+parent_emails
     query_str=" OR ".join(combined_emails)
     #st.write(f"{combined_emails=}, {query_str=}")
-    show_search_page(combined_emails)
+    show_search_page(combined_emails,days)
     
     # 2. Get email of their parents
     # Search by df_n["URL"]="/show_search_page?q="+df_n['student']+' OR '+df_n['all_emails']
@@ -108,13 +109,34 @@ def show_past_session_details(topics):
     else:
         df["URL"]="/show_zoom_detail_page?q="+df['session_id']
         st.dataframe(df, column_config={"URL": st.column_config.LinkColumn("URL", display_text="Session details")}, hide_index=True)
+        return df
         
+def days_since_last_session(past_sessions):
+    if past_sessions is None:
+        return 90
+    #st.write(f"Past sessions: {past_sessions.info()}")
+    df=past_sessions
+    df['date'] = pd.to_datetime(df['date'])
+
+    #max_date = df['date'].max().normalize() 
+    #today = pd.Timestamp.now().normalize()
+    max_date = df['date'].max()
+    today = pd.Timestamp.now()
+    days_inclusive = math.ceil((today - max_date) / pd.Timedelta(days=1))
+    return days_inclusive
+
 def show_users_student_details():
     student_name = st.query_params.get("q")
     st.title(f"Person: {student_name}")
     df=st.session_state.get('topic_list')
     df = df[df['Person'] == student_name]
     topics = df['Topic'].dropna().str.strip().tolist()
-    show_past_session_details(topics)
-    show_calendar_info(topics)
-    show_email_info(student_name)
+    with st.expander("Recent sessions"):
+        past_sessions=show_past_session_details(topics)
+    with st.expander("Upcoming Zoom sessions"):
+        show_calendar_info(topics)
+    with st.expander("Recent emails"):
+        days=days_since_last_session(past_sessions)
+        show_email_info(student_name,days)
+    with st.expander("All emails"):
+        show_email_info(student_name,90)

@@ -173,18 +173,19 @@ def show_messages_in_ui(rows,max_rows=10):
                 st.divider()
 
 @traceable(run_type="tool")
-def search_ui(creds: Credentials, query_term=None) -> None:
-    search_expression = " in:all newer_than:90d"
+def search_ui(creds: Credentials, days, query_term=None) -> None:
+    search_expression = f" in:all newer_than:{days}d"
     if query_term:
         new_term=' OR '.join(query_term)
         search_expression = new_term + search_expression
     st.subheader("Mail messages for Coordinator")
     #print(f"Search UI: {query_term=}, {new_term=}, {search_expression=}")
-    limit = st.sidebar.slider("Max results", min_value=100, max_value=1000, value=200, step=100)
+    #limit = st.sidebar.slider("Max results", min_value=100, max_value=1000, value=200, step=100)
+    limit=200
     fetch_all = False
     q = st.text_input("Gmail search query", value=search_expression, label_visibility="hidden")
 
-    run = st.button("Search")
+    run = st.button("Search",key=f"Search {days}")
     if run or query_term:
         start = time.perf_counter()
         with st.spinner("Fetching results from Gmail API…", show_time=True):
@@ -215,7 +216,7 @@ def search_ui(creds: Credentials, query_term=None) -> None:
         duration = f"{elapsed*1000:.0f} ms" if elapsed < 1 else f"{elapsed:.2f} s"
         st.sidebar.caption(f"Summarization took {duration}")
     
-def show_search_page(query_term=None) -> None:
+def show_search_page(query_term=None, days=90) -> None:
     
     supabase = SupabaseClient(url=os.environ.get("SUPABASE_URL", ""), key=os.environ.get('SUPABASE_KEY', ""))
     store = SupabaseTokenStore(supabase) if supabase else TokenStore(TOKEN_FILE)
@@ -225,7 +226,7 @@ def show_search_page(query_term=None) -> None:
     if creds and creds.valid:
         if not query_term:
             query_term = st.query_params.get("q")
-        search_ui(creds,query_term=query_term)
+        search_ui(creds,query_term=query_term, days=days)
         return
     else:
         st.error("Invalid credentials")
