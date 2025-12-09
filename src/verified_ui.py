@@ -6,6 +6,7 @@ from langsmith import traceable
 
 st.set_page_config(layout="wide")
 
+from utils import configs
 from utils.supabase_integration import SupabaseClient
 import pandas as pd
 
@@ -20,6 +21,7 @@ from src.show_fetch_zoom_aws import show_fetch_zoom_aws
 from src.show_users_students import show_users_students, show_users_student_details
 
 from utils.process_gsheets import get_users_students
+from utils.braintree_integration import sync_transactions_last_n_days
     
 def show_events_all():
     st.title("Events all page")
@@ -59,8 +61,26 @@ def show_sidebar_ui(user):
                 st.logout()
             except StopException:
                 return
+            
+def show_braintree():
+    st.title("BrainTree")
+    supabase = SupabaseClient(url=os.environ["SUPABASE_URL"], key=os.environ['SUPABASE_KEY'])
 
-@traceable(run_type="tool")
+    days=st.sidebar.number_input("Sync Days", value=3)
+    if st.sidebar.button("Sync"):
+        with st.spinner("Syncing...", show_time=True):
+            #st.warning("Sorry - Sync not implemented yet.")
+            cb = configs.braintree
+            #print(f"Debug: {cb=}")
+            mid,pubk,prik=cb['BRAINTREE_MERCHANT_ID'],cb['BRAINTREE_PUBLIC_KEY'],cb['BRAINTREE_PRIVATE_KEY']
+            print(f"Debug2:{mid=}, {pubk=}, {prik=}")
+            transactions=sync_transactions_last_n_days(supabase,days,mid,pubk,prik)
+            #st.write(transactions) 
+    ndays=st.number_input("Number of days", value=30)
+    trs=supabase.get_braintree_last_n_days(ndays)
+    st.dataframe(trs)   
+        
+
 def show_ui_core(user):
     show_sidebar_ui(user)
     set_student_list(user)
@@ -93,8 +113,7 @@ def show_ui_core(user):
         # Streamlit uses StopException internally to control reruns/navigation
         # Swallow it so it doesn't get surfaced to external tracers/loggers
         return
-
-@traceable(run_type="tool")    
+   
 def show_ui_superadmin(user):
     show_sidebar_ui(user)
     set_student_list(user)
@@ -120,8 +139,41 @@ def show_ui_superadmin(user):
         pg.run()
     except StopException:
         return
+    
+def show_ui_financeadmin(user):
+    show_sidebar_ui(user)
+    set_student_list(user)
+    
+    pages = {
+        "Finance": [
+            st.Page(show_braintree,title="Briantree"),
+        ],
+        "Finance-User": [
+            st.Page(show_users_students,title="User's students"),
+            st.Page(show_users_student_details,title="User's student details"),
+        ],
+        "Finance-Second": [
+            st.Page(show_search_page, title="Email Search"),
+            st.Page(show_zoom_session_page, title="Sessions"),
+            st.Page(show_zoom_detail_page, title="Session Details"),
+        ],
+        "Finance-Archive": [
+            st.Page(show_students_page, title="Students"),
+            st.Page(show_student_email_calendar, title="Calendar"),
+            st.Page(show_fetch_zoom_aws, title="Fetch AWS"),
+            #st.Page(show_instructors_page, title="Instructors"),
+            st.Page(show_gmail_fetch_control, title="GMail Fetch"),
+            
+        ],
 
-@traceable(run_type="tool")    
+    }
+
+    pg = st.navigation(pages, position="top")
+    try:
+        pg.run()
+    except StopException:
+        return
+   
 def show_ui_admin(user):
     show_sidebar_ui(user)
     set_student_list(user)
@@ -157,7 +209,6 @@ def show_ui_admin(user):
     except StopException:
         return
 
-@traceable(run_type="tool")
 def show_ui_guest(user):
     st.title("Guest Access")
     st.write(f"You do not have access. Please reach out to System Administrator with your information\n Email: {user.get("email", "Unknown Email")}.")
@@ -168,13 +219,11 @@ def show_ui_guest(user):
             return
     #show_ui_core(user)
 
-@traceable(run_type="tool")
 def show_ui_user(user):
     #st.title("User Access")
     #st.write("Welcome to the user panel. More features coming soon!")
     show_ui_core(user)
 
-@traceable(run_type="tool")
 def show_ui(user):
     if user and user.get("email_verified", False):
         supabase = SupabaseClient(url=os.environ["SUPABASE_URL"], key=os.environ['SUPABASE_KEY'])
@@ -187,6 +236,8 @@ def show_ui(user):
             role= user_record.get("role", "guest")
             if role == "superadmin":
                 show_ui_superadmin(user)
+            elif role == "financeadmin":
+                show_ui_financeadmin(user)
             elif role == "admin":
                 show_ui_admin(user)
             elif role == "user":

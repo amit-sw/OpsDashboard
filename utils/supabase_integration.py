@@ -1,4 +1,5 @@
 import os
+from datetime import datetime, timedelta, timezone
 from supabase import create_client, Client
 
 
@@ -307,3 +308,41 @@ class SupabaseClient:
         except Exception as e:
             print(f"Error fetching YT Tasks from database: {e}")
             return None
+        
+    def upsert_braintree(self, record):
+        try:
+            response = (
+                self.supabase
+                .table('braintree_transactions')
+                .upsert(record)
+                .execute()
+            )
+            return response.data or []
+        except Exception as e:
+            print(f"Error upserting record: {e}")
+            return []
+        
+    def get_braintree(self):
+        try:
+            response = self.supabase.table('braintree_transactions').select('*').execute()
+            if response.data:
+                return response.data
+            return None
+        except Exception as e:
+            print(f"Error fetching Braintree transactions from database: {e}")
+            return None
+        
+    def get_braintree_last_n_days(self,n):
+        try:
+            cutoff = (datetime.now(timezone.utc) - timedelta(days=n)).isoformat()
+            response = (
+                self.supabase
+                .table('braintree_transactions')
+                .select('*')
+                .gte('created_at', cutoff)
+                .execute()
+            )
+            return response.data or []
+        except Exception as e:
+            print(f"Error fetching Braintree transactions from database: {e}")
+            return []
