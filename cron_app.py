@@ -143,7 +143,8 @@ def process_braintree(supabase,duration):
     sync_transactions_last_n_days(supabase, duration, merchant_id,public_key,private_key)
     return
 
-def process_finance_mails(supabase,current_date,end_date):
+def process_finance_mails(supabase,duration):
+    print("TO-DO TO-DO TO-DO: Finance mail processing")
     return
         
 def main_cron_processing(supabase_url, supabase_key, cronId, duration):
@@ -171,7 +172,7 @@ def main_cron_processing(supabase_url, supabase_key, cronId, duration):
     if cronId=="BrainTree":
         process_braintree(supabase,int(duration))
     if cronId=="FinanceMails":
-        process_finance_mails(supabase,current_date,end_date)
+        process_finance_mails(supabase,int(duration))
         
 def main():
     for key, value in os.environ.items():
