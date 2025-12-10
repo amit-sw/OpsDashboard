@@ -151,18 +151,23 @@ def main_cron_processing(supabase_url, supabase_key, cronId, duration):
     
     end_date = datetime.date.today()+datetime.timedelta(days=1)
     start_date = end_date - datetime.timedelta(days=int(duration))
-        
-    current_date=start_date
-    while current_date <= end_date:
-        date_str=current_date.strftime("%Y-%m-%d")
-        print(f"DEBUG: Selected date: {date_str}")
-        if cronId=="Sessions":
+    
+    if cronId=="Sessions":    
+        current_date=start_date
+        while current_date <= end_date:
+            date_str=current_date.strftime("%Y-%m-%d")
+            print(f"DEBUG Sessions: Selected date: {date_str}")
             rows= process_one_day_fetch_selection(date_str)
-        if cronId=="QnA":
-            rows = process_one_day_qna(supabase, date_str)
+            current_date += datetime.timedelta(days=1)
 
-        df = pd.DataFrame(rows)
-        current_date += datetime.timedelta(days=1)
+    if cronId=="QnA":
+        current_date=start_date    
+        while current_date <= end_date:
+            date_str=current_date.strftime("%Y-%m-%d")
+            print(f"DEBUG QnA: Selected date: {date_str}")
+            rows = process_one_day_qna(supabase, date_str)
+            current_date += datetime.timedelta(days=1)
+        
     if cronId=="BrainTree":
         process_braintree(supabase,int(duration))
     if cronId=="FinanceMails":
