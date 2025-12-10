@@ -20,6 +20,8 @@ from utils.supabase_integration import SupabaseClient
 from utils.utils_transcript_chat import llm_request_response
 from utils.prompts import question_prompts
 
+from utils.braintree_integration import sync_transactions_last_n_days
+
 def process_one_record(rec, column_names, region):
     values = [extract_field_value(field) for field in rec]
     new_row = dict(zip(column_names, values))
@@ -133,6 +135,16 @@ def process_one_day_qna(supabase, date_str):
         #for row in rows:
         #    process_zoomsession_for_qna(supabase, row)
     return rows
+
+def process_braintree(supabase,duration):
+    merchant_id=os.environ.get("BRAINTREE_MERCHANT_ID")
+    public_key=os.environ.get("BRAINTREE_PUBLIC_KEY")
+    private_key=os.environ.get("BRAINTREE_PRIVATE_KEY")
+    sync_transactions_last_n_days(supabase, duration, merchant_id,public_key,private_key)
+    return
+
+def process_finance_mails(supabase,current_date,end_date):
+    return
         
 def main_cron_processing(supabase_url, supabase_key, cronId, duration):
     supabase = SupabaseClient(url=supabase_url, key=supabase_key)
@@ -151,6 +163,10 @@ def main_cron_processing(supabase_url, supabase_key, cronId, duration):
 
         df = pd.DataFrame(rows)
         current_date += datetime.timedelta(days=1)
+    if cronId=="BrainTree":
+        process_braintree(supabase,int(duration))
+    if cronId=="FinanceMails":
+        process_finance_mails(supabase,current_date,end_date)
         
 def main():
     for key, value in os.environ.items():
@@ -165,6 +181,8 @@ def main():
     
     main_cron_processing(supabase_url, supabase_key, "Sessions", duration)
     main_cron_processing(supabase_url, supabase_key, "QnA", duration)
+    main_cron_processing(supabase_url, supabase_key, "BrainTree", duration)
+    main_cron_processing(supabase_url, supabase_key, "FinanceMails", duration)
     
 if __name__ == "__main__":
     main()

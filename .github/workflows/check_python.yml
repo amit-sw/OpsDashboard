@@ -47,6 +47,11 @@ jobs:
       AGENTMAIL_FROM_ADDRESS: ${{ secrets.AGENTMAIL_FROM_ADDRESS }} 
       AGENTMAIL_TO_ADDRESS: ${{ secrets.AGENTMAIL_TO_ADDRESS }}
 
+      # BrainTree Secrets
+      BRAINTREE_MERCHANT_ID: ${{ secrets.BRAINTREE_MERCHANT_ID }}
+      BRAINTREE_PUBLIC_KEY: ${{ secrets.BRAINTREE_PUBLIC_KEY }}
+      BRAINTREE_PRIVATE_KEY: ${{ secrets.BRAINTREE_PRIVATE_KEY }}
+
     steps:
       - name: 1. Check out repository
         uses: actions/checkout@v4
