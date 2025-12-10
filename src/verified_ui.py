@@ -76,9 +76,13 @@ def show_braintree():
             print(f"Debug2:{mid=}, {pubk=}, {prik=}")
             transactions=sync_transactions_last_n_days(supabase,days,mid,pubk,prik)
             #st.write(transactions) 
-    ndays=st.number_input("Number of days", value=30)
+    ndays=st.number_input("Number of days", value=3000)
     trs=supabase.get_braintree_last_n_days(ndays)
-    st.dataframe(trs)   
+    df = pd.DataFrame(trs)
+    df.drop(columns=["order_id", "customer_id", "merchant_account_id", "payment_instrument_type"], inplace=True)
+    st.write(f"Displaying {len(df)} records for lookback of {ndays} days")
+    st.dataframe(df, hide_index=True )   
+    
         
 
 def show_ui_core(user):

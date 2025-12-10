@@ -335,14 +335,23 @@ class SupabaseClient:
     def get_braintree_last_n_days(self,n):
         try:
             cutoff = (datetime.now(timezone.utc) - timedelta(days=n)).isoformat()
-            response = (
-                self.supabase
-                .table('braintree_transactions')
-                .select('*')
-                .gte('created_at', cutoff)
-                .execute()
-            )
-            return response.data or []
+            limit = 1000
+            offset = 0
+            rows = []
+            while True:
+                batch = (
+                    self.supabase
+                    .table('braintree_transactions')
+                    .select('*')
+                    .gte('created_at', cutoff)
+                    .range(offset, offset + limit - 1)
+                    .execute()
+                ).data or []
+                rows.extend(batch)
+                if len(batch) < limit:
+                    break
+                offset += limit
+            return rows
         except Exception as e:
             print(f"Error fetching Braintree transactions from database: {e}")
             return []
