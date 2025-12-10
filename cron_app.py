@@ -179,10 +179,15 @@ def main():
 
     duration=os.environ.get("duration","2")
     
+    print(f"Trace: Before Sessions")
     main_cron_processing(supabase_url, supabase_key, "Sessions", duration)
+    print(f"Trace: Before QnA")
     main_cron_processing(supabase_url, supabase_key, "QnA", duration)
+    print(f"Trace: Before BrainTree")
     main_cron_processing(supabase_url, supabase_key, "BrainTree", duration)
+    print(f"Trace: Before FinanceMails")
     main_cron_processing(supabase_url, supabase_key, "FinanceMails", duration)
+    print(f"Trace: After All")
     
 if __name__ == "__main__":
     main()
