@@ -3,6 +3,8 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 
+import streamlit as st
+
 import pandas as pd
 
 
@@ -114,8 +116,10 @@ def get_info_gsheets(service_account_info, sheets_list):
         df_sessions=pd.DataFrame(list_sessions[1:],columns=list_sessions[0])
     return df_persons, df_relations, df_sessions
 
-def get_users_students(email, service_account_info, sheets_list):
+@st.cache_data(ttl=3600)
+def get_users_students(email, _service_account_info, sheets_list):
 
+    service_account_info=_service_account_info
     df_persons,df_relations,df_sessions=get_info_gsheets(service_account_info, sheets_list)
 
     person_names = set(df_persons.loc[df_persons['Email'].fillna('').str.strip().str.lower() == email,'Name'].astype(str))
