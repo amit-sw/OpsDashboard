@@ -151,7 +151,7 @@ def process_finance_mails(supabase,duration):
     finance_allowed_list=configs.finance_approved_list
     params={'allowed_senders':finance_allowed_list}
     print(f"Params are: {params=}")
-    process_messages('finance@aiclubagent.com',['unread'], ['processed'],['unread'], params)
+    process_messages(print,'finance@aiclubagent.com',['unread'], ['processed'],['unread'], params)
     
     return
         

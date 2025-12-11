@@ -49,11 +49,9 @@ def finance_chat():
 
 def show_finance_agent():
     #st.title("Finance Agent")
-    tab1,tab2=st.tabs(["Email check","Chat"])
-    with tab1:
-        email_check()
-    with tab2:
-        finance_chat()
+    email_check()
+    st.divider()
+    finance_chat()
 
             
 def show_braintree():

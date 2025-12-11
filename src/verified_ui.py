@@ -19,9 +19,10 @@ from src.show_instructors_page import show_instructors_page
 from src.show_gmail_fetch_control import show_gmail_fetch_control
 from src.show_fetch_zoom_aws import show_fetch_zoom_aws
 from src.show_users_students import show_users_students, show_users_student_details
+from src.show_finance_info import show_braintree, show_finance_agent
 
 from utils.process_gsheets import get_users_students
-from utils.braintree_integration import sync_transactions_last_n_days
+
     
 def show_events_all():
     st.title("Events all page")
@@ -61,27 +62,7 @@ def show_sidebar_ui(user):
                 st.logout()
             except StopException:
                 return
-            
-def show_braintree():
-    st.title("BrainTree")
-    supabase = SupabaseClient(url=os.environ["SUPABASE_URL"], key=os.environ['SUPABASE_KEY'])
 
-    days=st.sidebar.number_input("Sync Days", value=3)
-    if st.sidebar.button("Sync"):
-        with st.spinner("Syncing...", show_time=True):
-            #st.warning("Sorry - Sync not implemented yet.")
-            cb = configs.braintree
-            #print(f"Debug: {cb=}")
-            mid,pubk,prik=cb['BRAINTREE_MERCHANT_ID'],cb['BRAINTREE_PUBLIC_KEY'],cb['BRAINTREE_PRIVATE_KEY']
-            print(f"Debug2:{mid=}, {pubk=}, {prik=}")
-            transactions=sync_transactions_last_n_days(supabase,days,mid,pubk,prik)
-            #st.write(transactions) 
-    ndays=st.number_input("Number of days", value=3000)
-    trs=supabase.get_braintree_last_n_days(ndays)
-    df = pd.DataFrame(trs)
-    df.drop(columns=["order_id", "customer_id", "merchant_account_id", "payment_instrument_type"], inplace=True)
-    st.write(f"Displaying {len(df)} records for lookback of {ndays} days")
-    st.dataframe(df, hide_index=True )   
     
         
 
@@ -150,6 +131,7 @@ def show_ui_financeadmin(user):
     
     pages = {
         "Finance": [
+            st.Page(show_finance_agent,title="Finance Agent"),
             st.Page(show_braintree,title="Briantree"),
         ],
         "Finance-User": [
