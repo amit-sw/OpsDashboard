@@ -17,6 +17,8 @@ langchain-core
 langchain-openai
 langsmith
 
+langgraph
+
 atlassian-python-api
 markdownify
 posthog

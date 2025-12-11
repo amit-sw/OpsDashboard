@@ -355,3 +355,15 @@ class SupabaseClient:
         except Exception as e:
             print(f"Error fetching Braintree transactions from database: {e}")
             return []
+        
+    def get_braintree_formatted_last_n_days(self, n):
+        trans=self.get_braintree_last_n_days(n)
+        results=[]
+        for t in trans:
+            status=t.get('status')
+            dat=t.get('created_at')
+            amount=t.get('amount')
+            customer_email=t.get('customer_email')
+            if status=="settled":
+                results.append(f"Date={dat},Amount={amount},Customer={customer_email}")
+        return results

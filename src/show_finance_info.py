@@ -1,32 +1,97 @@
 import streamlit as st
 import os
+import pandas as pd
+import time
 
+import uuid
 
 from utils.supabase_integration import SupabaseClient
 from utils import configs
 
 from utils.braintree_integration import sync_transactions_last_n_days
 from utils.agentmail_integration import process_messages
+from utils.finance_graph import FinancebotAgent
 
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 
+DEFAULT_DAYS=91
+DEFAULT_FULL_INFO=365*10
+
+def format_revenue(title: str, sdf: pd.DataFrame, scol: str, n: int) -> str:
+    df = sdf.sort_values(scol, ascending=False).copy()
+    df = df.head(n)
+    df[scol] = df[scol].astype(str)
+    lines = [f"{getattr(row, scol)} {row.amount}" for row in df.itertuples(index=False)]
+    lines_str="\n".join(lines)
+
+    # Wrap with separators
+    result = f"\n*********\n{title}\n\n\n{lines_str} \n*********"
+    return result
+
+@st.cache_data(ttl=3600)
+def get_basic_braintree_info(_supabase, num_days):
+    supabase=_supabase
+    records=supabase.get_braintree_last_n_days(DEFAULT_FULL_INFO)
+    df1=pd.DataFrame(records)
+    df1["created_at"] = pd.to_datetime(df1["created_at"])
+    
+    df1["day"] = df1["created_at"].dt.to_period("D")
+    df1["month"] = df1["created_at"].dt.to_period("M")
+    df1["quarter"] = df1["created_at"].dt.to_period("Q")
+    df1["year"] = df1["created_at"].dt.to_period("Y")
+    daily_revenue = df1.groupby("day")["amount"].sum().reset_index()
+    monthly_revenue = df1.groupby("month")["amount"].sum().reset_index()
+    quarterly_revenue = df1.groupby("quarter")["amount"].sum().reset_index()
+    annual_revenue = df1.groupby("year")["amount"].sum().reset_index()
+    
+    st.caption("Basic braintree information")
+    #st.dataframe(df1)
+    #st.dataframe(daily_revenue)
+    #st.dataframe(monthly_revenue)
+    #st.dataframe(quarterly_revenue)
+    #st.dataframe(annual_revenue)
+    #combined="Background information:\n"+"\n".join(records)
+    daily_revenue_str=format_revenue("Daily Revenue", daily_revenue, "day", num_days)
+    monthly_revenue_str=format_revenue("Monthly Revenue", monthly_revenue, "month", 1234)
+    quarterly_revenue_str=format_revenue("Quarterly Revenue", quarterly_revenue, "quarter", 1234)
+    annual_revenue_str=format_revenue("Annual Revenue", annual_revenue, "year", 1234)
+    response_str="All revenue amounts are in USD \n"+annual_revenue_str+quarterly_revenue_str+monthly_revenue_str+ daily_revenue_str
+    with st.sidebar.expander("Raw data"):
+        st.write(response_str)
+    return response_str
+
+
+@st.cache_data(ttl=3600)
+def get_braintree_info(_supabase,days):
+    supabase=_supabase
+    records=supabase.get_braintree_last_n_days(DEFAULT_DAYS)
+    df6=pd.DataFrame(records)
+    st.caption("Braintree info")
+    #st.dataframe(df6)
+    #combined="Background information:\n"+"\n".join(records)
+    return df6
+    
 
 def email_check():
-    if st.button("Trigger email check"):
+    if st.sidebar.button("Trigger email check"):
         finance_allowed_list=configs.finance_approved_list
         params={'allowed_senders':finance_allowed_list}
         st.write(f"Params are: {params=}")
         process_messages(st.write,'finance@aiclubagent.com',['unread'], ['processed'],['unread'], params)
     
-def finance_chat():
+def finance_chat_old():
     st.title("Finance Chat")
     client = ChatOpenAI(model="gpt-4o-mini")
+    supabase = SupabaseClient(url=os.environ["SUPABASE_URL"], key=os.environ['SUPABASE_KEY'])
 
     if "messages" not in st.session_state:
         st.session_state.messages = []
         
-    msgs=[]
+    revenue_str=get_basic_braintree_info(supabase,DEFAULT_DAYS)
+    xx=get_braintree_info(supabase,DEFAULT_DAYS)
+    core_msg=revenue_str
+    msgs=[HumanMessage(core_msg)]
 
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
@@ -46,9 +111,54 @@ def finance_chat():
             response = client.invoke(msgs)
             st.markdown(response.content)
         st.session_state.messages.append({"role": "assistant", "content": response.content})
+        
+def finance_chat():
+    st.title("Finance Chat")
+    client = ChatOpenAI(model="gpt-4o-mini")
+    app=FinancebotAgent(os.environ["OPENAI_API_KEY"])
+    supabase = SupabaseClient(url=os.environ["SUPABASE_URL"], key=os.environ['SUPABASE_KEY'])
+
+    msgs=[]
+    
+    if "revenue_str" not in st.session_state:
+        revenue_str=get_basic_braintree_info(supabase,DEFAULT_DAYS)
+        st.session_state.revenue_str = revenue_str
+    
+    if "messages" not in st.session_state:
+        st.session_state.messages=[]
+        
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+        if message['role']=='user':
+            msgs.append(HumanMessage(message['content']))
+        if message['role']=='assistant':
+            msgs.append(AIMessage(message['content']))
+
+    if prompt := st.chat_input("What is up?"):
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
+        msgs.append(HumanMessage(prompt))
+
+        with st.chat_message("assistant"):
+            #response = client.invoke(msgs)
+            rsp=app.graph.invoke({'messages': st.session_state.messages, 'revenue_str':st.session_state.revenue_str}, {"configurable":{"thread_id":uuid.uuid4()}})
+            #st.sidebar.json(rsp)
+            for k,v in rsp.items():
+                if k == "response":
+                    st.markdown(v)
+                    st.session_state.messages.append({"role": "assistant", "content": v})
 
 def show_finance_agent():
     #st.title("Finance Agent")
+    supabase = SupabaseClient(url=os.environ["SUPABASE_URL"], key=os.environ['SUPABASE_KEY'])
+    start_ts = time.perf_counter()
+    with st.spinner("Pre-loading...", show_time=True):
+        revenue_str=get_basic_braintree_info(supabase,DEFAULT_DAYS)
+    with st.sidebar:
+        st.caption(f"Pre-load finished in {time.perf_counter() - start_ts:.2f} seconds")
+        #st.download_button(label="Download CSV",data=cmb,file_name="data.txt",icon=":material/download:",)
     email_check()
     st.divider()
     finance_chat()
