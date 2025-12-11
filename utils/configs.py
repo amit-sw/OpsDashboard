@@ -7,6 +7,11 @@ gdrive_secrets: dict[str, str]
 gmail_oauth: dict[str, str]
 env: dict[str, str]
 
+finance_approved_list={
+    'chrissy.hildebrant@pyxeda.ai',
+    'amitamit@gmail.com'
+}
+
 def load(secrets: dict):
     global auth, braintree, calendar, gdrive_secrets, gmail_oauth, env
     auth = secrets.get("auth", {})

@@ -12,6 +12,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from agentmail import AgentMail
 
+from utils import configs
+
 from utils.utils_aws import save_to_supabase, fetch_s3_object, extract_field_value
 from utils.utils_aws import derive_column_names, decode_json_value, get_sql_query_aws_date 
 
@@ -21,6 +23,7 @@ from utils.utils_transcript_chat import llm_request_response
 from utils.prompts import question_prompts
 
 from utils.braintree_integration import sync_transactions_last_n_days
+from utils.agentmail_integration import process_messages
 
 def process_one_record(rec, column_names, region):
     values = [extract_field_value(field) for field in rec]
@@ -82,7 +85,7 @@ def process_one_day_fetch_selection(date_str):
         rows.append(new_row)
     return rows
 
-def email_out(topic,response_list):
+def qna_email_out(topic,response_list):
     API_KEY=os.environ['AGENTMAIL_API_KEY']
     FROM_ADDRESS=os.environ['AGENTMAIL_FROM_ADDRESS'] 
     TO_ADDRESS=os.environ['AGENTMAIL_TO_ADDRESS'] 
@@ -113,7 +116,7 @@ def process_zoomsession_for_qna(supabase, row):
             #print(f"Response Content: {response_content}")
             response_list.append({"qt":q_topic,"rc":response_content})
         supabase.update_zoomsession_status(session_id, "QnA Completed")
-        email_out(topic,response_list)
+        qna_email_out(topic,response_list)
     except Exception as e:
         print(f"ERROR processing ZoomSession for QnA for session {session_id}: {e}")
 
@@ -145,6 +148,11 @@ def process_braintree(supabase,duration):
 
 def process_finance_mails(supabase,duration):
     print("TO-DO TO-DO TO-DO: Finance mail processing")
+    finance_allowed_list=configs.finance_approved_list
+    params={'allowed_senders':finance_allowed_list}
+    print(f"Params are: {params=}")
+    process_messages('finance@aiclubagent.com',['unread'], ['processed'],['unread'], params)
+    
     return
         
 def main_cron_processing(supabase_url, supabase_key, cronId, duration):
