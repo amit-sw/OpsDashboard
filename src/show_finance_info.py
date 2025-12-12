@@ -30,37 +30,9 @@ def format_revenue(title: str, sdf: pd.DataFrame, scol: str, n: int) -> str:
     return result
 
 @st.cache_data(ttl=3600)
-def get_basic_braintree_info(_supabase, num_days):
-    supabase=_supabase
-    records=supabase.get_braintree_last_n_days(DEFAULT_FULL_INFO)
-    df1=pd.DataFrame(records)
-    df1["created_at"] = pd.to_datetime(df1["created_at"])
-    
-    df1["day"] = df1["created_at"].dt.to_period("D")
-    df1["month"] = df1["created_at"].dt.to_period("M")
-    df1["quarter"] = df1["created_at"].dt.to_period("Q")
-    df1["year"] = df1["created_at"].dt.to_period("Y")
-    daily_revenue = df1.groupby("day")["amount"].sum().reset_index()
-    monthly_revenue = df1.groupby("month")["amount"].sum().reset_index()
-    quarterly_revenue = df1.groupby("quarter")["amount"].sum().reset_index()
-    annual_revenue = df1.groupby("year")["amount"].sum().reset_index()
-    
-    st.caption("Basic braintree information")
-    #st.dataframe(df1)
-    #st.dataframe(daily_revenue)
-    #st.dataframe(monthly_revenue)
-    #st.dataframe(quarterly_revenue)
-    #st.dataframe(annual_revenue)
-    #combined="Background information:\n"+"\n".join(records)
-    daily_revenue_str=format_revenue("Daily Revenue", daily_revenue, "day", num_days)
-    monthly_revenue_str=format_revenue("Monthly Revenue", monthly_revenue, "month", 1234)
-    quarterly_revenue_str=format_revenue("Quarterly Revenue", quarterly_revenue, "quarter", 1234)
-    annual_revenue_str=format_revenue("Annual Revenue", annual_revenue, "year", 1234)
-    response_str="All revenue amounts are in USD \n"+annual_revenue_str+quarterly_revenue_str+monthly_revenue_str+ daily_revenue_str
-    with st.sidebar.expander("Raw data"):
-        st.write(response_str)
-    return response_str
-
+def get_cached_braintree_info(_supabase, num_days):
+    records=_supabase.get_basic_braintree_info(DEFAULT_DAYS)
+    return records
 
 @st.cache_data(ttl=3600)
 def get_braintree_info(_supabase,days):
@@ -88,7 +60,7 @@ def finance_chat_old():
     if "messages" not in st.session_state:
         st.session_state.messages = []
         
-    revenue_str=get_basic_braintree_info(supabase,DEFAULT_DAYS)
+    revenue_str=get_cached_braintree_info(supabase,DEFAULT_DAYS)
     xx=get_braintree_info(supabase,DEFAULT_DAYS)
     core_msg=revenue_str
     msgs=[HumanMessage(core_msg)]
@@ -121,7 +93,7 @@ def finance_chat():
     msgs=[]
     
     if "revenue_str" not in st.session_state:
-        revenue_str=get_basic_braintree_info(supabase,DEFAULT_DAYS)
+        revenue_str=get_cached_braintree_info(supabase,DEFAULT_DAYS)
         st.session_state.revenue_str = revenue_str
     
     if "messages" not in st.session_state:
@@ -155,7 +127,7 @@ def show_finance_agent():
     supabase = SupabaseClient(url=os.environ["SUPABASE_URL"], key=os.environ['SUPABASE_KEY'])
     start_ts = time.perf_counter()
     with st.spinner("Pre-loading...", show_time=True):
-        revenue_str=get_basic_braintree_info(supabase,DEFAULT_DAYS)
+        revenue_str=get_cached_braintree_info(supabase,DEFAULT_DAYS)
     with st.sidebar:
         st.caption(f"Pre-load finished in {time.perf_counter() - start_ts:.2f} seconds")
         #st.download_button(label="Download CSV",data=cmb,file_name="data.txt",icon=":material/download:",)
