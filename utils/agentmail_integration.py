@@ -11,7 +11,7 @@ import uuid
 
 from utils.supabase_integration import SupabaseClient, DEFAULT_DAYS
 
-def process_one_email(fr,to,subject,txt):
+def process_one_email(fr,to,subject,txt,etxt):
     client = ChatOpenAI(model="gpt-4o-mini")
     app=FinancebotAgent(os.environ["OPENAI_API_KEY"])
     supabase = SupabaseClient(url=os.environ["SUPABASE_URL"], key=os.environ['SUPABASE_KEY'])
@@ -19,7 +19,8 @@ def process_one_email(fr,to,subject,txt):
     records=supabase.get_basic_braintree_info(DEFAULT_DAYS)
     message=f""" 
     {subject}\n
-    {txt}
+    {txt}\n
+    Restarted as: {etxt}
     """
     messages=[{"role": "user", "content": message}]
     
@@ -37,12 +38,10 @@ def process_email(output,client,inbox,msg,params):
     fr=msg.from_
     to=msg.to
     subject=msg.subject
-    txt=msg.preview
-    resp=process_one_email(fr,to,subject,txt)
-    reply = client.inboxes.messages.reply(
-        inbox_id=inbox,
-        message_id=msg.message_id,
-        text=resp)
+    txt=msg.text
+    etxt=msg.extracted_text
+    resp=process_one_email(fr,to,subject,txt,etxt)
+    reply = client.inboxes.messages.reply(inbox_id=inbox,message_id=msg.message_id,text=resp)
 
     output(f"Reply sent successfully with ID: {reply.message_id}")
     
@@ -71,10 +70,13 @@ def process_one_message(output,client,mailbox,msg, params):
 def process_messages(output,mailbox,search_labels, add_labels,remove_labels, params):
     client = AgentMail(api_key=os.getenv('AGENTMAIL_API_KEY'))
     msgs=client.inboxes.messages.list(inbox_id=mailbox, labels=search_labels)
+    
     output(f"Saw {len(msgs.messages)} messages")
     for msg in msgs.messages:
-        process_one_message(output,client, mailbox, msg, params)
         message_id=msg.message_id
+        new_msg=client.inboxes.messages.get(inbox_id=mailbox,message_id=message_id)
+        process_one_message(output,client, mailbox, new_msg, params)
+        
         output(f"AgentMail: Updating. {message_id=}, {add_labels=}, {remove_labels=}, {mailbox=}")
         client.inboxes.messages.update(
             inbox_id=mailbox,

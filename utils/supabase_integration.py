@@ -387,6 +387,7 @@ class SupabaseClient:
     def get_basic_braintree_info(self, num_days):
         records=self.get_braintree_last_n_days(DEFAULT_FULL_INFO)
         df1=pd.DataFrame(records)
+        df1 = df1[df1["status"] == "settled"]
         df1["created_at"] = pd.to_datetime(df1["created_at"])
         
         df1["day"] = df1["created_at"].dt.to_period("D")
