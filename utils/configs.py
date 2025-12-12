@@ -8,7 +8,7 @@ gmail_oauth: dict[str, str]
 env: dict[str, str]
 
 finance_approved_list={
-    'chrissy.hildebrant@pyxeda.ai',
+    'chrissy.hildebrandt@pyxeda.ai',
     'amitamit@gmail.com'
 }
 
