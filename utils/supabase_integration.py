@@ -312,6 +312,20 @@ class SupabaseClient:
             print(f"Error creating instructor: {e}")
             return []
         
+    def get_zoomsession_negative_tokenlength_by_date(self, date, threshold=0):
+        try:
+            response = (
+                self.supabase.table('zoom_sessions')
+                .select('*')
+                .eq('date', date)
+                .lt('transcript_token_count', threshold)
+                .execute()
+            )
+            return response.data or []
+        except Exception as e:
+            print(f"Error fetching zoom sessions for token update: {e}")
+            return []
+        
     def update_zoomsession_status(self, session_id,qna_status):
         try:
             response = self.supabase.table('zoom_sessions').update({'qna_status': qna_status}).eq('session_id', session_id).execute()

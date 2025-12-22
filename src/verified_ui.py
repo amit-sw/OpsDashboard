@@ -21,6 +21,7 @@ from src.show_fetch_zoom_aws import show_fetch_zoom_aws
 from src.show_users_students import show_users_students, show_users_student_details
 from src.show_finance_info import show_braintree, show_finance_agent
 from src.show_table_explorer import show_table_explorer
+from src.show_sheet_explorer import show_sheet_explorer
 
 from utils.process_gsheets import get_users_students
 
@@ -91,6 +92,7 @@ def show_ui_core(user):
         ],
         "Data": [
             st.Page(show_table_explorer, title="Table Explorer"),
+            st.Page(show_sheet_explorer, title="Sheet Explorer"),
         ],
 
     }
@@ -124,6 +126,7 @@ def show_ui_superadmin(user):
         ],
         "Data": [
             st.Page(show_table_explorer, title="Table Explorer"),
+            st.Page(show_sheet_explorer, title="Sheet Explorer"),
         ],
     }
     pg = st.navigation(pages, position="top")
@@ -160,6 +163,7 @@ def show_ui_financeadmin(user):
         ],
         "Finance-Data": [
             st.Page(show_table_explorer, title="Table Explorer"),
+            st.Page(show_sheet_explorer, title="Sheet Explorer"),
         ],
 
     }
@@ -198,6 +202,7 @@ def show_ui_admin(user):
         ],
         "Data": [
             st.Page(show_table_explorer, title="Table Explorer"),
+            st.Page(show_sheet_explorer, title="Sheet Explorer"),
         ],
 
     }

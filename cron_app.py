@@ -9,6 +9,7 @@ import pandas as pd
 
 import boto3
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import tiktoken
 
 from agentmail import AgentMail
 
@@ -25,6 +26,9 @@ from utils.prompts import question_prompts
 from utils.braintree_integration import sync_transactions_last_n_days
 from utils.agentmail_integration import process_messages
 from src.langsmith_logging import log_qna_response
+
+TOKEN_ENCODING_ENV = "TOKEN_COUNT_ENCODING"
+_token_encoder = None
 
 
 def _mask_secret(value):
@@ -175,6 +179,44 @@ def process_finance_mails(supabase,duration):
     process_messages(print,'finance@aiclubagent.com',['unread'], ['processed'],['unread'], params)
     
     return
+
+def _normalize_transcript(transcript):
+    if transcript is None:
+        return ""
+    if isinstance(transcript, (list, tuple)):
+        return "\n".join(str(part) for part in transcript if part)
+    if isinstance(transcript, dict):
+        return str(transcript)
+    return str(transcript)
+
+def _count_tokens(text: str) -> int:
+    global _token_encoder
+    if _token_encoder is None:
+        encoding_name = os.environ.get(TOKEN_ENCODING_ENV, "cl100k_base")
+        try:
+            _token_encoder = tiktoken.get_encoding(encoding_name)
+        except Exception:
+            _token_encoder = tiktoken.get_encoding("cl100k_base")
+    return len(_token_encoder.encode(text))
+
+def process_one_day_token_counts(supabase, date_str):
+    rows = supabase.get_zoomsession_negative_tokenlength_by_date(date_str, 0)
+    print(f"DEBUG TokenCount: Found {len(rows)} sessions for date {date_str}")
+    updated = 0
+    for row in rows:
+        transcript_text = _normalize_transcript(row.get("transcript")).strip()
+        if not transcript_text:
+            continue
+        try:
+            token_count = _count_tokens(transcript_text)
+        except Exception as exc:
+            session_id = row.get("session_id")
+            print(f"ERROR counting tokens for session {session_id}: {exc}")
+            continue
+        supabase.update_zoom_session_tokenlength(row.get("id"), token_count)
+        updated += 1
+    print(f"DEBUG TokenCount: Updated {updated} sessions for date {date_str}")
+    return updated
         
 def main_cron_processing(supabase_url, supabase_key, cronId, duration):
     supabase = SupabaseClient(url=supabase_url, key=supabase_key)
@@ -202,6 +244,13 @@ def main_cron_processing(supabase_url, supabase_key, cronId, duration):
         process_braintree(supabase,int(duration))
     if cronId=="FinanceMails":
         process_finance_mails(supabase,int(duration))
+    if cronId=="TokenCount":
+        current_date = start_date
+        while current_date <= end_date:
+            date_str = current_date.strftime("%Y-%m-%d")
+            print(f"DEBUG TokenCount: Selected date: {date_str}")
+            process_one_day_token_counts(supabase, date_str)
+            current_date += datetime.timedelta(days=1)
         
 def main():
     for key, value in os.environ.items():
@@ -222,6 +271,8 @@ def main():
     main_cron_processing(supabase_url, supabase_key, "BrainTree", duration)
     print(f"Trace: Before FinanceMails")
     main_cron_processing(supabase_url, supabase_key, "FinanceMails", duration)
+    print(f"Trace: Before TokenCount")
+    main_cron_processing(supabase_url, supabase_key, "TokenCount", duration)
     print(f"Trace: After All")
     
 if __name__ == "__main__":

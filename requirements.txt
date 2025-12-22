@@ -32,3 +32,4 @@ agentmail
 
 python-dotenv
 
+tiktoken
