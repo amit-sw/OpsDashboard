@@ -2,7 +2,10 @@ import re
 from io import BytesIO
 from typing import Any, Iterable, Mapping, Optional, Sequence
 
-from markitdown import MarkItDown
+try:
+    from markitdown import MarkItDown  # type: ignore
+except ImportError:  # pragma: no cover - dependency optional in tests
+    MarkItDown = None  # type: ignore
 
 def normalize_query_value(value: Any) -> Optional[str]:
     """Return a single string value from Streamlit query parameters."""
@@ -74,6 +77,8 @@ def pdf_bytes_to_text(pdf_bytes: bytes) -> str:
     """Return extracted text from raw PDF bytes."""
     if not pdf_bytes:
         return ""
+    if MarkItDown is None:
+        raise RuntimeError("markitdown is required to parse PDF uploads")
     converter = MarkItDown(enable_plugins=True)
     result = converter.convert(BytesIO(pdf_bytes))
     return result.text_content or ""

@@ -5,6 +5,9 @@ from src.core_utils import pdf_bytes_to_text
 def process_uploaded_pdf(uploaded_file):
     st.write("Processing the uploaded PDF...")
     file_bytes = uploaded_file.read()
+    if not file_bytes:
+        st.warning("The uploaded PDF is empty.")
+        return
     extracted_text = pdf_bytes_to_text(file_bytes)
     st.text_area("Extracted PDF text", extracted_text, height=360)
 

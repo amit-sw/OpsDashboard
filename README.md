@@ -13,6 +13,7 @@ Some key files:
 - `utils/posthog_integration.py` will centralize PostHog analytics helpers.
 - `src/core_utils.py` provides shared helpers such as query-parameter normalization for Streamlit pages.
 - `src/show_pdf_upload.py` streams uploaded PDFs through `pdf_bytes_to_text(...)` so the extracted content can be reviewed inside the Streamlit UI.
+- `src/show_table_explorer.py` surfaces the Supabase Table Explorer page that all authenticated roles (except guests) can use to browse live data.
 
 ## Testing
 

@@ -1,11 +1,50 @@
-import os
-from datetime import datetime, timedelta, timezone
-from supabase import create_client, Client
+from __future__ import annotations
 
-import pandas as pd
+import os
+
+from datetime import datetime, timedelta, timezone
+from typing import TYPE_CHECKING, Any
+
+try:
+    from supabase import create_client, Client  # type: ignore
+except ImportError:  # pragma: no cover - optional in unit tests
+    create_client = None  # type: ignore
+    Client = Any  # type: ignore
+
+def _import_pandas():
+    try:
+        import pandas as pandas_module  # type: ignore
+    except Exception as exc:  # pragma: no cover - optional in tests
+        raise RuntimeError("pandas is required for this operation") from exc
+    return pandas_module
+
+
+if TYPE_CHECKING:  # pragma: no cover
+    import pandas as pd
 
 DEFAULT_DAYS=91
 DEFAULT_FULL_INFO=365*10
+DEFAULT_TABLE_LIMIT=200
+
+USED_SUPABASE_TABLES=tuple(sorted({
+    "authorized_users",
+    "braintree_transactions",
+    "calendar_events",
+    "confluence_pages",
+    "gm_tokens",
+    "gmail_message_index",
+    "gmail_messages",
+    "instructors",
+    "research_program_students",
+    "session_qna",
+    "yt_prompt",
+    "yt_prompts",
+    "yt_qna",
+    "yt_tasks",
+    "yt_videos",
+    "yt_video_qna",
+    "zoom_sessions",
+}))
 
 def format_revenue(title: str, sdf: pd.DataFrame, scol: str, n: int) -> str:
     df = sdf.sort_values(scol, ascending=False).copy()
@@ -22,10 +61,34 @@ def format_revenue(title: str, sdf: pd.DataFrame, scol: str, n: int) -> str:
 class SupabaseClient:
     def __init__(self, url, key):
         try:
+            if create_client is None:
+                raise ImportError("supabase client is not installed")
             self.supabase: Client = create_client(url, key)
         except Exception as e:
             print(f"ERROR. Error connecting to Supabase: {e}. You provided {url=}, {key=}")
             self.supabase = None
+
+    def list_known_tables(self):
+        """Return the sorted list of application tables tracked in Supabase."""
+        return list(USED_SUPABASE_TABLES)
+
+    def fetch_table_rows(self, table_name, limit=DEFAULT_TABLE_LIMIT):
+        """Fetch up to ``limit`` rows from the requested table."""
+        if not self.supabase or table_name not in USED_SUPABASE_TABLES:
+            return []
+        row_limit = min(max(int(limit or DEFAULT_TABLE_LIMIT), 1), 2000)
+        try:
+            response = (
+                self.supabase
+                .table(table_name)
+                .select('*')
+                .limit(row_limit)
+                .execute()
+            )
+            return response.data or []
+        except Exception as e:
+            print(f"Error pulling table rows: {e}. {table_name=}, {row_limit=}")
+            return []
 
     def get_calendar_events_from_db(self):
         """Gets calendar events from the 'calendar_events' table in Supabase."""
@@ -386,6 +449,7 @@ class SupabaseClient:
     
     def get_basic_braintree_info(self, num_days):
         records=self.get_braintree_last_n_days(DEFAULT_FULL_INFO)
+        pd = _import_pandas()
         df1=pd.DataFrame(records)
         df1 = df1[df1["status"] == "settled"]
         df1["created_at"] = pd.to_datetime(df1["created_at"])
