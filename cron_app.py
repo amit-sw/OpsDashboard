@@ -25,6 +25,16 @@ from utils.prompts import question_prompts
 from utils.braintree_integration import sync_transactions_last_n_days
 from utils.agentmail_integration import process_messages
 
+
+def _mask_secret(value):
+    """Return value with only the first three characters visible."""
+    if value is None:
+        return ""
+    text = str(value)
+    if len(text) <= 3:
+        return text + "***"
+    return text[:3] + "*" * (len(text) - 3)
+
 def get_bucket_contents(bucket,key,region):
     content=""
     if bucket and key:
@@ -184,7 +194,7 @@ def main_cron_processing(supabase_url, supabase_key, cronId, duration):
         
 def main():
     for key, value in os.environ.items():
-        print(key, value)
+        print(key, _mask_secret(value))
     supabase_url = os.environ["SUPABASE_URL"]
     supabase_key=os.environ['SUPABASE_KEY']
     

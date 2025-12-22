@@ -210,7 +210,10 @@ def show_ui_admin(user):
 
 def show_ui_guest(user):
     st.title("Guest Access")
-    st.write(f"You do not have access. Please reach out to System Administrator with your information\n Email: {user.get("email", "Unknown Email")}.")
+    st.write(
+        "You do not have access. Please reach out to the System Administrator "
+        f"with your information\n Email: {user.get('email', 'Unknown Email')}."
+    )
     if st.button("Log out"):
         try:
             st.logout()

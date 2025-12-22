@@ -42,17 +42,17 @@ class CalendarClient:
             #with st.expander("all_events in CalendarIntegration.GetEventsForEmails."):
             #    st.dataframe(all_events)
             #    st.json(all_events)
-            lower_emails = [email.lower() for email in emails if email]
-            if not lower_emails:
+            normalized = [(email, email.lower()) for email in emails if email]
+            if not normalized:
                 return {}
-            email_events = {email: [] for email in emails if email}
+            email_events = {email: [] for email, _ in normalized}
             for event in all_events:
                 attendees = event.get("attendees", [])
                 if not attendees:
                     continue
                 attendee_emails = [attendee.get("email", "").lower() for attendee in attendees]
-                for i, email in enumerate(emails):
-                    if email and lower_emails[i] in attendee_emails:
+                for email, lower_email in normalized:
+                    if lower_email in attendee_emails:
                         email_events[email].append(event)
             #with st.expander("email_events in CalendarIntegration.GetEventsForEmails."):
             #    st.dataframe(email_events)

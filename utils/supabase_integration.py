@@ -11,6 +11,16 @@ except ImportError:  # pragma: no cover - optional in unit tests
     create_client = None  # type: ignore
     Client = Any  # type: ignore
 
+
+def _mask_secret(value):
+    """Return a secret value with only its first three characters visible."""
+    if value is None:
+        return ""
+    text = str(value)
+    if len(text) <= 3:
+        return text + "***"
+    return text[:3] + "*" * (len(text) - 3)
+
 def _import_pandas():
     try:
         import pandas as pandas_module  # type: ignore
@@ -65,7 +75,10 @@ class SupabaseClient:
                 raise ImportError("supabase client is not installed")
             self.supabase: Client = create_client(url, key)
         except Exception as e:
-            print(f"ERROR. Error connecting to Supabase: {e}. You provided {url=}, {key=}")
+            print(
+                "ERROR. Error connecting to Supabase: "
+                f"{e}. You provided {url=}, key={_mask_secret(key)}"
+            )
             self.supabase = None
 
     def list_known_tables(self):

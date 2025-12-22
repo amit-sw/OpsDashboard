@@ -47,3 +47,6 @@ For deveelopers:
 
 
    We are keeping two sets of Google Credentials - one for Gmail, one for YT
+
+Assumptions:
+- The Google Sheets powering student and relationship data always expose an `Email` column, so utility modules such as `utils/process_gsheets.py` rely on its presence without additional guards.

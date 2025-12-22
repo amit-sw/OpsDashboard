@@ -1,7 +1,10 @@
 import os
 import json
 
-import boto3
+try:  # pragma: no cover - optional dependency for tests
+    import boto3
+except ImportError:  # pragma: no cover - boto3 not available in CI
+    boto3 = None
 
 from utils.supabase_integration import SupabaseClient
 
@@ -49,6 +52,8 @@ def save_to_supabase(params):
 
 def fetch_s3_object(bucket: str, key: str, region: str) -> bytes:
     """Download an object from S3 and return its raw bytes."""
+    if boto3 is None:  # pragma: no cover - requires boto3 installed
+        raise RuntimeError("boto3 is required to fetch S3 objects")
     s3_client = boto3.client("s3", region_name=region)
     response = s3_client.get_object(Bucket=bucket, Key=key)
     return response["Body"].read()

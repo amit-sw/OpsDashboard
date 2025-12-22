@@ -6,7 +6,10 @@ import datetime
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-import boto3
+try:  # pragma: no cover - boto3 optional for unit tests
+    import boto3
+except ImportError:  # pragma: no cover
+    boto3 = None
 import pandas as pd
 
 from utils.utils_aws import setup_env_from_dict, save_to_supabase, fetch_s3_object, extract_field_value
@@ -17,6 +20,12 @@ from utils.supabase_integration import SupabaseClient
 from utils.utils_transcript_chat import llm_request_response
 from utils.prompts import question_prompts
     
+
+def _require_boto3():
+    if boto3 is None:
+        raise RuntimeError("boto3 is required for AWS Zoom session syncing")
+    return boto3
+
 
 def get_sql_query_aws_session_id():
     return """
@@ -70,7 +79,7 @@ def process_one_day_fetch_selection(date_str):
     secret_arn=os.environ.get("SECRET_ARN")
     db_name=os.environ.get("DB_NAME")
     
-    client = boto3.client("rds-data", region_name=region)
+    client = _require_boto3().client("rds-data", region_name=region)
     
     sql_qry = get_sql_query_aws_date(date_str)
     with st.sidebar.expander("SQL Query"):
@@ -135,7 +144,7 @@ def process_one_session(session_id):
         st.write(sql_qry)
 
     try:
-        client = boto3.client("rds-data", region_name=region)
+        client = _require_boto3().client("rds-data", region_name=region)
         response = client.execute_statement(
             resourceArn=cluster_arn,
             secretArn=secret_arn,
