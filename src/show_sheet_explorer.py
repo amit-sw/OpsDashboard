@@ -124,6 +124,5 @@ def show_sheet_explorer():
             "Open Sheet": st.column_config.LinkColumn("Open Sheet", display_text="Open")
         },
         hide_index=True,
-        use_container_width=True,
         disabled=True,
     )

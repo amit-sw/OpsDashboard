@@ -156,7 +156,6 @@ def show_ui_financeadmin(user):
         "Finance-Archive": [
             st.Page(show_students_page, title="Students"),
             st.Page(show_student_email_calendar, title="Calendar"),
-            st.Page(show_fetch_zoom_aws, title="Fetch AWS"),
             #st.Page(show_instructors_page, title="Instructors"),
             st.Page(show_gmail_fetch_control, title="GMail Fetch"),
             
@@ -164,6 +163,7 @@ def show_ui_financeadmin(user):
         "Finance-Data": [
             st.Page(show_table_explorer, title="Table Explorer"),
             st.Page(show_sheet_explorer, title="Sheet Explorer"),
+            st.Page(show_fetch_zoom_aws, title="CRON explorer"),
         ],
 
     }
@@ -197,12 +197,12 @@ def show_ui_admin(user):
         "Past Sessions": [
             st.Page(show_zoom_session_page, title="Sessions"),
             st.Page(show_zoom_detail_page, title="Session Details"),
-            st.Page(show_fetch_zoom_aws, title="Fetch AWS"),
             
         ],
         "Data": [
             st.Page(show_table_explorer, title="Table Explorer"),
             st.Page(show_sheet_explorer, title="Sheet Explorer"),
+            st.Page(show_fetch_zoom_aws, title="CRON explorer"),
         ],
 
     }
