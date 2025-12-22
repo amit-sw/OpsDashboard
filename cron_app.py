@@ -25,6 +25,16 @@ from utils.prompts import question_prompts
 from utils.braintree_integration import sync_transactions_last_n_days
 from utils.agentmail_integration import process_messages
 
+def get_bucket_contents(bucket,key,region):
+    content=""
+    if bucket and key:
+        s3_content = fetch_s3_object(bucket, key, region)
+        try:
+            content = s3_content.decode("utf-8")
+        except UnicodeDecodeError:
+            content = base64.b64encode(s3_content).decode("ascii")
+    return content
+
 def process_one_record(rec, column_names, region):
     values = [extract_field_value(field) for field in rec]
     new_row = dict(zip(column_names, values))
@@ -32,36 +42,26 @@ def process_one_record(rec, column_names, region):
     transcript_obj = decode_json_value(new_row.get("transcript"))
     #print(f"DEBUG: {transcript_obj=} with type {type(transcript_obj)}")
 
-    bucket = None
-    key = None
     if isinstance(transcript_obj, list) and transcript_obj:
-        entry = transcript_obj[0]
-        if isinstance(entry, dict):
-            bucket = entry.get("bucket")
-            key = entry.get("key")
-
-    if bucket and key:
-        #print("IF C")
-        s3_content = fetch_s3_object(bucket, key, region)
-        try:
-            #print("STEP A")
-            new_row["transcript"] = s3_content.decode("utf-8")
-            #new_row["transcript_encoding"] = "utf-8"
-        except UnicodeDecodeError:
-            print("STEP B")
-            new_row["transcript"] = base64.b64encode(s3_content).decode("ascii")
-            #new_row["transcript_encoding"] = "base64"
-        #new_row["transcript_bucket"] = bucket
-        #new_row["transcript_key"] = key
-        new_row.pop('time_zone', None)
-        save_to_supabase(new_row)
-        return new_row
+        parts = []
+        for entry in transcript_obj:
+            if isinstance(entry, dict):
+                bucket = entry.get("bucket")
+                key = entry.get("key")
+                transcript = get_bucket_contents(bucket, key, region)
+                if transcript:
+                    parts.append(transcript)
+        if parts:
+            new_row["transcript"] = "".join(parts)
+            new_row.pop("time_zone", None)
+            save_to_supabase(new_row)
+        else:
+            print(f"ERROR: No valid S3 bucket/key found in transcript_obj: {transcript_obj}")
+            new_row["transcript"] = None
     else:
-        print(f"ERROR: No valid S3 bucket/key found in transcript_obj: {transcript_obj}")
+        print(f"ERROR: No valid transcript list found in transcript_obj: {transcript_obj}")
         new_row["transcript"] = None
-        #new_row["transcript_encoding"] = None
-        #save_to_supabase(new_row)
-        return new_row
+    return new_row
     
 def process_one_day_fetch_selection(date_str):
     region=os.environ.get("AWS_REGION")
