@@ -18,6 +18,24 @@ from utils.utils_transcript_chat import llm_request_response
 from utils.prompts import question_prompts
     
 
+def get_sql_query_aws_session_id():
+    return """
+    SELECT session_id,project_id,instructor_names,youtube_link,session_summary,timestamp,date,time_zone,zoom_link,topic,transcript
+    FROM navigator_PRODUCTION.project_sessions
+    WHERE session_id = :session_id
+    LIMIT 1;
+    """
+
+def get_bucket_contents(bucket, key, region):
+    content = ""
+    if bucket and key:
+        s3_content = fetch_s3_object(bucket, key, region)
+        try:
+            content = s3_content.decode("utf-8")
+        except UnicodeDecodeError:
+            content = base64.b64encode(s3_content).decode("ascii")
+    return content
+
 def process_one_record(rec, column_names, region):
     values = [extract_field_value(field) for field in rec]
     new_row = dict(zip(column_names, values))
@@ -25,36 +43,26 @@ def process_one_record(rec, column_names, region):
     transcript_obj = decode_json_value(new_row.get("transcript"))
     #print(f"DEBUG: {transcript_obj=} with type {type(transcript_obj)}")
 
-    bucket = None
-    key = None
     if isinstance(transcript_obj, list) and transcript_obj:
-        entry = transcript_obj[0]
-        if isinstance(entry, dict):
-            bucket = entry.get("bucket")
-            key = entry.get("key")
-
-    if bucket and key:
-        #print("IF C")
-        s3_content = fetch_s3_object(bucket, key, region)
-        try:
-            #print("STEP A")
-            new_row["transcript"] = s3_content.decode("utf-8")
-            #new_row["transcript_encoding"] = "utf-8"
-        except UnicodeDecodeError:
-            print("STEP B")
-            new_row["transcript"] = base64.b64encode(s3_content).decode("ascii")
-            #new_row["transcript_encoding"] = "base64"
-        #new_row["transcript_bucket"] = bucket
-        #new_row["transcript_key"] = key
-        new_row.pop('time_zone', None)
-        save_to_supabase(new_row)
-        return new_row
+        parts = []
+        for entry in transcript_obj:
+            if isinstance(entry, dict):
+                bucket = entry.get("bucket")
+                key = entry.get("key")
+                transcript = get_bucket_contents(bucket, key, region)
+                if transcript:
+                    parts.append(transcript)
+        if parts:
+            new_row["transcript"] = "".join(parts)
+            new_row.pop("time_zone", None)
+            save_to_supabase(new_row)
+        else:
+            print(f"ERROR: No valid S3 bucket/key found in transcript_obj: {transcript_obj}")
+            new_row["transcript"] = None
     else:
-        print(f"ERROR: No valid S3 bucket/key found in transcript_obj: {transcript_obj}")
+        print(f"ERROR: No valid transcript list found in transcript_obj: {transcript_obj}")
         new_row["transcript"] = None
-        #new_row["transcript_encoding"] = None
-        #save_to_supabase(new_row)
-        return new_row
+    return new_row
     
 def process_one_day_fetch_selection(date_str):
     region=os.environ.get("REGION")
@@ -113,8 +121,41 @@ def process_one_day_qna(supabase, date_str):
         #    process_zoomsession_for_qna(supabase, row)
     return rows
         
+def process_one_session(session_id):
+    region = os.environ.get("REGION")
+    cluster_arn = os.environ.get("CLUSTER_ARN")
+    secret_arn = os.environ.get("SECRET_ARN")
+    db_name = os.environ.get("DB_NAME")
+    if not all([region, cluster_arn, secret_arn, db_name]):
+        st.error("Missing AWS DB env vars: REGION/CLUSTER_ARN/SECRET_ARN/DB_NAME.")
+        return []
 
+    sql_qry = get_sql_query_aws_session_id()
+    with st.sidebar.expander("SQL Query"):
+        st.write(sql_qry)
 
+    try:
+        client = boto3.client("rds-data", region_name=region)
+        response = client.execute_statement(
+            resourceArn=cluster_arn,
+            secretArn=secret_arn,
+            database=db_name,
+            sql=sql_qry,
+            parameters=[{"name": "session_id", "value": {"stringValue": str(session_id)}}],
+            includeResultMetadata=True,
+        )
+    except Exception as e:
+        st.error(f"Failed to fetch session `{session_id}` from AWS DB: {e}")
+        return []
+
+    records = response.get("records", [])
+    if not records:
+        st.warning(f"No AWS DB record found for session `{session_id}`.")
+        return []
+
+    column_names = derive_column_names(response.get("columnMetadata", []))
+    return [process_one_record(rec, column_names, region) for rec in records]
+    
 
 def show_fetch_zoom_aws():
     env_secrets=st.secrets.get("env")  
@@ -123,9 +164,16 @@ def show_fetch_zoom_aws():
     
     supabase = SupabaseClient(url=os.environ["SUPABASE_URL"], key=os.environ['SUPABASE_KEY'])
         
-    options = ["Sessions", "QnA"]
+    options = ["Sessions", "QnA","One Session"]
     fetch_selection = st.segmented_control("Fetch ", options, default='Sessions')
     st.markdown(f"Your selected options: {fetch_selection}.")
+    if fetch_selection=="One Session":
+        if session_id:=st.text_input("SessionId"):
+            if st.button("Fetch Session"):
+                rows = process_one_session(session_id)
+                if rows:
+                    st.dataframe(pd.DataFrame(rows))
+        st.stop()
     
     today = datetime.date.today()
     last_week = today - datetime.timedelta(days=7)
