@@ -24,6 +24,7 @@ from utils.prompts import question_prompts
 
 from utils.braintree_integration import sync_transactions_last_n_days
 from utils.agentmail_integration import process_messages
+from src.langsmith_logging import log_qna_response
 
 
 def _mask_secret(value):
@@ -125,6 +126,16 @@ def process_zoomsession_for_qna(supabase, row):
             response_content=llm_request_response(supabase,model,session_id,transcript,topic,q_prompt)
             #print(f"Response Content: {response_content}")
             response_list.append({"qt":q_topic,"rc":response_content})
+            log_qna_response(
+                session_id=session_id,
+                topic=topic,
+                question_topic=q_topic,
+                prompt=q_prompt,
+                transcript=transcript,
+                response=response_content,
+                source="cron_app",
+                tags=["cron"],
+            )
         supabase.update_zoomsession_status(session_id, "QnA Completed")
         qna_email_out(topic,response_list)
     except Exception as e:

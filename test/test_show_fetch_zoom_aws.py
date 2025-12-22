@@ -61,6 +61,7 @@ def test_process_one_record_handles_missing_transcript(monkeypatch):
 
 def test_process_zoomsession_for_qna_invokes_llm_and_updates_status(monkeypatch):
     calls = []
+    logged = []
 
     class DummySupabase:
         def __init__(self):
@@ -73,8 +74,12 @@ def test_process_zoomsession_for_qna_invokes_llm_and_updates_status(monkeypatch)
         calls.append((model, session_id, topic, prompt))
         return "ok"
 
+    def fake_log_qna_response(**kwargs):
+        logged.append(kwargs)
+
     monkeypatch.setattr(fetch_zoom, "question_prompts", {"Topic": "Prompt"})
     monkeypatch.setattr(fetch_zoom, "llm_request_response", fake_llm_request_response)
+    monkeypatch.setattr(fetch_zoom, "log_qna_response", fake_log_qna_response)
     monkeypatch.setenv("OPENAI_MODEL", "fake-model")
 
     supabase = DummySupabase()
@@ -83,3 +88,4 @@ def test_process_zoomsession_for_qna_invokes_llm_and_updates_status(monkeypatch)
 
     assert calls == [("fake-model", "session-9", "Focus", "Prompt")]
     assert supabase.status_updates == [("session-9", "QnA Completed")]
+    assert logged and logged[0]["session_id"] == "session-9"

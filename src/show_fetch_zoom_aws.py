@@ -19,6 +19,7 @@ from utils.supabase_integration import SupabaseClient
 
 from utils.utils_transcript_chat import llm_request_response
 from utils.prompts import question_prompts
+from src.langsmith_logging import log_qna_response
     
 
 def _require_boto3():
@@ -107,6 +108,16 @@ def process_zoomsession_for_qna(supabase, row):
             print(f"Processing QnA for session {session_id}, topic: {q_topic}")
             response_content=llm_request_response(supabase,model,session_id,transcript,topic,q_prompt)
             #print(f"Response Content: {response_content}")
+            log_qna_response(
+                session_id=session_id,
+                topic=topic,
+                question_topic=q_topic,
+                prompt=q_prompt,
+                transcript=transcript,
+                response=response_content,
+                source="cron_ui",
+                tags=["cron"],
+            )
         supabase.update_zoomsession_status(session_id, "QnA Completed")
     except Exception as e:
         print(f"ERROR processing ZoomSession for QnA for session {session_id}: {e}")
