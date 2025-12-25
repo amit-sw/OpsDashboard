@@ -198,6 +198,28 @@ grant select, insert, update, delete on opsdashboard.youtube_private_videos
   to anon, authenticated;
 
 -- allow API roles to see the schema
+
+-- =========================================================
+-- question_prompts
+-- =========================================================
+create table if not exists opsdashboard.question_prompts (
+  id            bigint primary key,
+  title         text not null,
+  prompt        text not null,
+  prompt_group  text not null default 'common',
+  status        text not null default 'active',
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now()
+);
+
+create sequence if not exists opsdashboard.question_prompts_id_seq
+  start with 10000 increment by 1;
+alter sequence opsdashboard.question_prompts_id_seq owned by opsdashboard.question_prompts.id;
+alter table opsdashboard.question_prompts
+  alter column id set default nextval('opsdashboard.question_prompts_id_seq');
+
+create unique index if not exists idx_question_prompts_title_group
+  on opsdashboard.question_prompts (title, prompt_group);
 grant usage on schema opsdashboard to anon, authenticated;
 
 -- allow basic table privileges

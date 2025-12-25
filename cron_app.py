@@ -125,7 +125,9 @@ def process_zoomsession_for_qna(supabase, row):
     model=os.environ.get("OPENAI_MODEL","gpt-5-mini")
     response_list=[]
     try:
-        for q_topic, q_prompt in question_prompts.items():
+        for prompt in question_prompts:
+            q_topic = prompt["title"]
+            q_prompt = prompt["prompt"]
             print(f"Processing QnA for session {session_id}, topic: {q_topic}")
             response_content=llm_request_response(supabase,model,session_id,transcript,topic,q_prompt)
             #print(f"Response Content: {response_content}")

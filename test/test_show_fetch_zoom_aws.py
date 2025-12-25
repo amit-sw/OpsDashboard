@@ -77,7 +77,7 @@ def test_process_zoomsession_for_qna_invokes_llm_and_updates_status(monkeypatch)
     def fake_log_qna_response(**kwargs):
         logged.append(kwargs)
 
-    monkeypatch.setattr(fetch_zoom, "question_prompts", {"Topic": "Prompt"})
+    monkeypatch.setattr(fetch_zoom, "question_prompts", [{"title": "Topic", "prompt": "Prompt"}])
     monkeypatch.setattr(fetch_zoom, "llm_request_response", fake_llm_request_response)
     monkeypatch.setattr(fetch_zoom, "log_qna_response", fake_log_qna_response)
     monkeypatch.setenv("OPENAI_MODEL", "fake-model")

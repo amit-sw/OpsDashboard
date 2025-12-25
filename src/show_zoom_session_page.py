@@ -169,7 +169,9 @@ def generate_answers(supabase_client, session_id, transcript: str):
         return
     
     with st.spinner("Generating answers ...", show_time=True):
-        for topic, request in question_prompts.items():
+        for prompt in question_prompts:
+            topic = prompt["title"]
+            request = prompt["prompt"]
             st.write(f"#### Topic: {topic}")
             rsp=llm_request_response(supabase_client,model,session_id,transcript,topic,request)
             st.write(rsp)

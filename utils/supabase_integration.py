@@ -45,6 +45,7 @@ USED_SUPABASE_TABLES=tuple(sorted({
     "gmail_message_index",
     "gmail_messages",
     "instructors",
+    "question_prompts",
     "research_program_students",
     "session_qna",
     "yt_prompt",
