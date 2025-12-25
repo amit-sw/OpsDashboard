@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 
 from datetime import datetime, timedelta, timezone
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Dict
 
 try:
     from supabase import create_client, Client  # type: ignore
@@ -120,6 +120,56 @@ class SupabaseClient:
             return response.data
         except Exception as e:
             print(f"Error fetching students from database: {e}")
+            return []
+
+    def list_question_prompts(self, status: str | None = "active", prompt_group: str | None = None):
+        """Return question_prompt rows filtered by optional status/group."""
+        if not self.supabase:
+            return []
+        try:
+            query = self.supabase.table('question_prompts').select('*')
+            if status:
+                query = query.eq('status', status)
+            if prompt_group:
+                query = query.eq('prompt_group', prompt_group)
+            response = query.order('title').execute()
+            return response.data or []
+        except Exception as e:
+            print(f"Error fetching question prompts: {e}")
+            return []
+
+    def insert_question_prompt(self, title: str, prompt: str, prompt_group: str, status: str = "active"):
+        """Insert a new question prompt row."""
+        if not self.supabase:
+            return []
+        try:
+            payload = {
+                'title': title,
+                'prompt': prompt,
+                'prompt_group': prompt_group,
+                'status': status,
+            }
+            response = self.supabase.table('question_prompts').insert(payload).execute()
+            return response.data or []
+        except Exception as e:
+            print(f"Error inserting question prompt: {e}")
+            return []
+
+    def update_question_prompt(self, prompt_id: int, updates: Dict[str, str]):
+        """Update fields on an existing question prompt row."""
+        if not self.supabase or not prompt_id or not updates:
+            return []
+        try:
+            response = (
+                self.supabase
+                .table('question_prompts')
+                .update(updates)
+                .eq('id', prompt_id)
+                .execute()
+            )
+            return response.data or []
+        except Exception as e:
+            print(f"Error updating question prompt: {e}")
             return []
 
     def get_student_emails_from_db(self):
