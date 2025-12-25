@@ -128,8 +128,17 @@ def process_zoomsession_for_qna(supabase, row):
         for prompt in question_prompts:
             q_topic = prompt["title"]
             q_prompt = prompt["prompt"]
+            q_group = prompt.get("prompt_group")
             print(f"Processing QnA for session {session_id}, topic: {q_topic}")
-            response_content=llm_request_response(supabase,model,session_id,transcript,topic,q_prompt)
+            response_content=llm_request_response(
+                supabase,
+                model,
+                session_id,
+                transcript,
+                topic,
+                q_prompt,
+                q_group,
+            )
             #print(f"Response Content: {response_content}")
             response_list.append({"qt":q_topic,"rc":response_content})
             log_qna_response(

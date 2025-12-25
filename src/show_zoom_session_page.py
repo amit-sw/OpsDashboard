@@ -172,8 +172,17 @@ def generate_answers(supabase_client, session_id, transcript: str):
         for prompt in question_prompts:
             topic = prompt["title"]
             request = prompt["prompt"]
+            prompt_group = prompt.get("prompt_group")
             st.write(f"#### Topic: {topic}")
-            rsp=llm_request_response(supabase_client,model,session_id,transcript,topic,request)
+            rsp=llm_request_response(
+                supabase_client,
+                model,
+                session_id,
+                transcript,
+                topic,
+                request,
+                prompt_group,
+            )
             st.write(rsp)
         refresh_qna_session(supabase_client, session_id)
         

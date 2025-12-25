@@ -41,6 +41,7 @@ def test_llm_request_response_records_qna(monkeypatch):
         "full transcript text",
         "Topic",
         "Prompt text",
+        "custom-group",
     )
 
     assert result == "LLM response"
@@ -50,3 +51,4 @@ def test_llm_request_response_records_qna(monkeypatch):
     assert supabase.saved["question_topic"] == "Topic"
     assert supabase.saved["question_text"] == "Prompt text"
     assert supabase.saved["model"] == "fake-model"
+    assert supabase.saved["prompt_group"] == "custom-group"

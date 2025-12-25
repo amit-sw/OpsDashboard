@@ -70,14 +70,26 @@ def test_process_zoomsession_for_qna_invokes_llm_and_updates_status(monkeypatch)
         def update_zoomsession_status(self, session_id, status):
             self.status_updates.append((session_id, status))
 
-    def fake_llm_request_response(supabase, model, session_id, transcript, topic, prompt):
-        calls.append((model, session_id, topic, prompt))
+    def fake_llm_request_response(
+        supabase,
+        model,
+        session_id,
+        transcript,
+        topic,
+        prompt,
+        prompt_group,
+    ):
+        calls.append((model, session_id, topic, prompt, prompt_group))
         return "ok"
 
     def fake_log_qna_response(**kwargs):
         logged.append(kwargs)
 
-    monkeypatch.setattr(fetch_zoom, "question_prompts", [{"title": "Topic", "prompt": "Prompt"}])
+    monkeypatch.setattr(
+        fetch_zoom,
+        "question_prompts",
+        [{"title": "Topic", "prompt": "Prompt", "prompt_group": "group-a"}],
+    )
     monkeypatch.setattr(fetch_zoom, "llm_request_response", fake_llm_request_response)
     monkeypatch.setattr(fetch_zoom, "log_qna_response", fake_log_qna_response)
     monkeypatch.setenv("OPENAI_MODEL", "fake-model")
@@ -86,6 +98,6 @@ def test_process_zoomsession_for_qna_invokes_llm_and_updates_status(monkeypatch)
     row = {"session_id": "session-9", "transcript": "hello", "topic": "Focus"}
     fetch_zoom.process_zoomsession_for_qna(supabase, row)
 
-    assert calls == [("fake-model", "session-9", "Focus", "Prompt")]
+    assert calls == [("fake-model", "session-9", "Focus", "Prompt", "group-a")]
     assert supabase.status_updates == [("session-9", "QnA Completed")]
     assert logged and logged[0]["session_id"] == "session-9"
