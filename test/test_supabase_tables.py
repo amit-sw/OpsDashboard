@@ -101,6 +101,94 @@ def test_format_revenue_returns_sorted_snippet():
     assert "2024-01-03 15" in result
 
 
+def test_list_qna_emails_orders_by_group_and_email():
+    captured = {}
+
+    class FakeQuery:
+        def __init__(self):
+            self.orders = []
+
+        def select(self, value):
+            captured["select"] = value
+            return self
+
+        def order(self, column, **kwargs):
+            self.orders.append(column)
+            return self
+
+        def execute(self):
+            captured["orders"] = self.orders
+            return SimpleNamespace(data=[{"id": 1}])
+
+    class FakeSupabase:
+        def table(self, name):
+            captured["table"] = name
+            return FakeQuery()
+
+    client = SupabaseClient.__new__(SupabaseClient)
+    client.supabase = FakeSupabase()
+
+    rows = client.list_qna_emails()
+
+    assert rows == [{"id": 1}]
+    assert captured["table"] == "qna_emails"
+    assert captured["select"] == "*"
+    assert captured["orders"] == ["prompt_group", "email"]
+
+
+def test_insert_qna_email_passes_payload(monkeypatch):
+    captured = {}
+
+    class FakeInsertQuery:
+        def insert(self, payload):
+            captured["payload"] = payload
+            return self
+
+        def execute(self):
+            return SimpleNamespace(data=[captured["payload"]])
+
+    class FakeSupabase:
+        def table(self, name):
+            captured["table"] = name
+            return FakeInsertQuery()
+
+    client = SupabaseClient.__new__(SupabaseClient)
+    client.supabase = FakeSupabase()
+
+    rows = client.insert_qna_email("ops", "person@example.com")
+    assert rows == [{"prompt_group": "ops", "email": "person@example.com"}]
+    assert captured["table"] == "qna_emails"
+
+
+def test_update_qna_email_filters_by_id():
+    captured = {"filters": []}
+
+    class FakeUpdateQuery:
+        def update(self, payload):
+            captured["updates"] = payload
+            return self
+
+        def eq(self, column, value):
+            captured["filters"].append((column, value))
+            return self
+
+        def execute(self):
+            return SimpleNamespace(data=[captured["updates"]])
+
+    class FakeSupabase:
+        def table(self, name):
+            captured["table"] = name
+            return FakeUpdateQuery()
+
+    client = SupabaseClient.__new__(SupabaseClient)
+    client.supabase = FakeSupabase()
+
+    rows = client.update_qna_email(99, {"prompt_group": "ops"})
+    assert rows == [{"prompt_group": "ops"}]
+    assert captured["table"] == "qna_emails"
+    assert captured["filters"] == [("id", 99)]
+
+
 def test_get_braintree_formatted_last_n_days_only_includes_settled(monkeypatch):
     client = SupabaseClient.__new__(SupabaseClient)
 

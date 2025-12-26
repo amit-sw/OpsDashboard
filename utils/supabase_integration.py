@@ -45,6 +45,7 @@ USED_SUPABASE_TABLES=tuple(sorted({
     "gmail_message_index",
     "gmail_messages",
     "instructors",
+    "qna_emails",
     "question_prompts",
     "research_program_students",
     "session_qna",
@@ -170,6 +171,56 @@ class SupabaseClient:
             return response.data or []
         except Exception as e:
             print(f"Error updating question prompt: {e}")
+            return []
+
+    def list_qna_emails(self):
+        """Return sorted rows from the qna_emails table."""
+        if not self.supabase:
+            return []
+        try:
+            response = (
+                self.supabase
+                .table('qna_emails')
+                .select('*')
+                .order('prompt_group')
+                .order('email')
+                .execute()
+            )
+            return response.data or []
+        except Exception as e:
+            print(f"Error fetching qna_emails: {e}")
+            return []
+
+    def insert_qna_email(self, prompt_group: str, email: str):
+        """Insert a qna_email row."""
+        if not self.supabase:
+            return []
+        try:
+            payload = {
+                'prompt_group': prompt_group,
+                'email': email,
+            }
+            response = self.supabase.table('qna_emails').insert(payload).execute()
+            return response.data or []
+        except Exception as e:
+            print(f"Error inserting qna_email: {e}")
+            return []
+
+    def update_qna_email(self, record_id: int, updates: Dict[str, str]):
+        """Update qna_email fields."""
+        if not self.supabase or not record_id or not updates:
+            return []
+        try:
+            response = (
+                self.supabase
+                .table('qna_emails')
+                .update(updates)
+                .eq('id', record_id)
+                .execute()
+            )
+            return response.data or []
+        except Exception as e:
+            print(f"Error updating qna_email: {e}")
             return []
 
     def get_student_emails_from_db(self):

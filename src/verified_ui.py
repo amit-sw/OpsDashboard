@@ -23,6 +23,7 @@ from src.show_finance_info import show_braintree, show_finance_agent
 from src.show_table_explorer import show_table_explorer
 from src.show_sheet_explorer import show_sheet_explorer
 from src.show_question_prompts import show_question_prompts_page
+from src.show_qna_emails import show_qna_emails_page
 
 from utils.process_gsheets import get_users_students
 
@@ -130,6 +131,7 @@ def show_ui_superadmin(user):
             st.Page(show_table_explorer, title="Table Explorer"),
             st.Page(show_sheet_explorer, title="Sheet Explorer"),
             st.Page(show_question_prompts_page, title="Question Prompts"),
+            st.Page(show_qna_emails_page, title="QnA Emails"),
         ],
     }
     pg = st.navigation(pages, position="top")
@@ -168,6 +170,7 @@ def show_ui_financeadmin(user):
             st.Page(show_sheet_explorer, title="Sheet Explorer"),
             st.Page(show_fetch_zoom_aws, title="CRON explorer"),
             st.Page(show_question_prompts_page, title="Question Prompts"),
+            st.Page(show_qna_emails_page, title="QnA Emails"),
         ],
 
     }

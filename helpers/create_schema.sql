@@ -220,6 +220,29 @@ alter table opsdashboard.question_prompts
 
 create unique index if not exists idx_question_prompts_title_group
   on opsdashboard.question_prompts (title, prompt_group);
+
+-- =========================================================
+-- qna_emails
+-- =========================================================
+create table if not exists opsdashboard.qna_emails (
+  id            bigint primary key,
+  prompt_group  text not null default 'common',
+  email         text not null,
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now(),
+  unique (prompt_group, email)
+);
+
+create sequence if not exists opsdashboard.qna_emails_id_seq
+  start with 10000 increment by 1;
+alter sequence opsdashboard.qna_emails_id_seq owned by opsdashboard.qna_emails.id;
+alter table opsdashboard.qna_emails
+  alter column id set default nextval('opsdashboard.qna_emails_id_seq');
+
+create or replace view public.qna_emails as
+  select * from opsdashboard.qna_emails;
+grant select, insert, update, delete on public.qna_emails to anon, authenticated;
+
 grant usage on schema opsdashboard to anon, authenticated;
 
 -- allow basic table privileges

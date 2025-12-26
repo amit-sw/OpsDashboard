@@ -17,3 +17,5 @@ Recent history uses short, descriptive summaries ("Added ability to process one 
 
 ## Security & Configuration Tips
 Never commit `.env`, `.venv`, `.streamlit/secrets.toml`, or JSON credential files; use Streamlit Secrets or local `.env` loading instead. Preserve the union of `.gitignore` entries already in the repo (e.g., `.DS_Store`, `*.pyo`, `*.pkl`) when adding the required `.env`, `.venv`, `.streamlit/secrets.toml`, and `*.json` patterns so future refreshes don’t drop ignores. Store Supabase and Google keys locally and document any required environment variables inside `README.md` plus `doc/`. Remove tokens after testing (`.tokens/`) and rotate credentials when switching between Gmail and YouTube OAuth apps.
+
+Whenever you add a new table or sequence inside the `opsdashboard` schema, also create a matching `public.<table>` view that selects from the base table and `GRANT SELECT, INSERT, UPDATE, DELETE` on that view to both the `authenticated` and `anon` roles. This keeps the Supabase API surface consistent without exposing the base schema directly.

@@ -16,6 +16,7 @@ Some key files:
 - `src/show_table_explorer.py` surfaces the Supabase Table Explorer page that all authenticated roles (except guests) can use to browse live data.
 - `src/show_sheet_explorer.py` adds the Sheet Explorer page so authenticated users can browse and open the Google Sheets the service account can access.
 - `src/show_question_prompts.py` lets every authenticated user review existing question prompts and add new rows (title, prompt, prompt_group) to the Supabase table, while Finance Admins and Super Admins can also edit existing prompts inline.
+- `src/show_qna_emails.py` restricts access to Finance Admins and Super Admins so they can manage the QnA email recipients stored in the `qna_emails` table (view rows, edit existing entries, and add new recipients).
 - `cron_app.py` coordinates background jobs (Sessions, QnA, BrainTree, FinanceMails, TokenCount) with TokenCount now recomputing negative `transcript_token_count` values via tiktoken for recent sessions.
 - `scripts/seed_question_prompts.py` seeds the `question_prompts` Supabase table so `utils/prompts.py` can load question templates dynamically.
 - `helpers/seed_question_prompts.sql` provides direct SQL inserts for the default prompt rows when applying migrations manually.
