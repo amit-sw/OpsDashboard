@@ -7,11 +7,17 @@ import base64
 import datetime
 import pandas as pd
 
-import boto3
+try:
+    import boto3
+except ImportError:  # pragma: no cover - boto3 optional in tests
+    boto3 = None  # type: ignore
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import tiktoken
 
-from agentmail import AgentMail
+try:
+    from agentmail import AgentMail
+except ImportError:  # pragma: no cover - optional in tests
+    AgentMail = None  # type: ignore
 
 from utils import configs
 
@@ -29,6 +35,7 @@ from src.langsmith_logging import log_qna_response
 
 TOKEN_ENCODING_ENV = "TOKEN_COUNT_ENCODING"
 _token_encoder = None
+DEFAULT_PROMPT_GROUP = "common"
 
 
 def _mask_secret(value):
@@ -83,6 +90,9 @@ def process_one_day_fetch_selection(date_str):
     cluster_arn=os.environ.get("AWS_CLUSTER_ARN")
     secret_arn=os.environ.get("AWS_SECRET_ARN")
     db_name=os.environ.get("AWS_DB_NAME")
+
+    if boto3 is None:
+        raise RuntimeError("boto3 is required to fetch Zoom sessions from AWS")
     
     client = boto3.client("rds-data", region_name=region)
     
@@ -100,17 +110,18 @@ def process_one_day_fetch_selection(date_str):
         rows.append(new_row)
     return rows
 
-def qna_email_out(topic,response_list):
+def qna_email_out(topic, response_list, prompt_group, to_address):
+    if AgentMail is None:
+        raise RuntimeError("AgentMail SDK is required to send QnA emails")
     API_KEY=os.environ['AGENTMAIL_API_KEY']
     FROM_ADDRESS=os.environ['AGENTMAIL_FROM_ADDRESS'] 
-    TO_ADDRESS=os.environ['AGENTMAIL_TO_ADDRESS'] 
     client = AgentMail(api_key=API_KEY)
-    subject = f"ACSV Session Summary for {topic}"
+    subject = f"[{prompt_group}] ACSV Session Summary for {topic}"
     text="\n\n".join([ f"TOPIC: {rsp['qt']}\n {rsp['rc']} " for rsp in response_list])
-    print(f"\n\nDEBUGGING: {subject=}, {text=}")
+    print(f"\n\nDEBUGGING: {subject=}, {text=}, to={to_address}")
     sent_message = client.inboxes.messages.send(
         inbox_id = FROM_ADDRESS,
-        to = TO_ADDRESS,
+        to = to_address,
         labels=["session","bot","test"],
         subject=subject,
         text=text,
@@ -118,17 +129,41 @@ def qna_email_out(topic,response_list):
     )
     print(f"Message sent successfully with ID: {sent_message.message_id}")
 
-def process_zoomsession_for_qna(supabase, row):
+def _load_qna_email_map(supabase):
+    """Return a dict of prompt_group -> recipient email."""
+    mapping = {}
+    rows = []
+    try:
+        rows = supabase.list_qna_emails()
+    except Exception as exc:  # pragma: no cover - defensive only
+        print(f"Error loading qna email map: {exc}")
+        return mapping
+    for row in rows or []:
+        group = (row.get("prompt_group") or "").strip()
+        email = (row.get("email") or "").strip()
+        if group and email:
+            mapping[group] = email
+    return mapping
+
+
+def _resolve_qna_recipient(prompt_group, qna_email_map, default_address):
+    normalized_group = (prompt_group or "").strip()
+    if normalized_group and qna_email_map.get(normalized_group):
+        return qna_email_map[normalized_group]
+    return default_address
+
+
+def process_zoomsession_for_qna(supabase, row, qna_email_map=None, default_to_address=None):
     session_id=row.get("session_id")
     transcript=row.get("transcript")
     topic=row.get("topic") or "General"
     model=os.environ.get("OPENAI_MODEL","gpt-5-mini")
-    response_list=[]
+    responses_by_group={}
     try:
         for prompt in question_prompts:
             q_topic = prompt["title"]
             q_prompt = prompt["prompt"]
-            q_group = prompt.get("prompt_group")
+            q_group = prompt.get("prompt_group") or DEFAULT_PROMPT_GROUP
             print(f"Processing QnA for session {session_id}, topic: {q_topic}")
             response_content=llm_request_response(
                 supabase,
@@ -140,7 +175,7 @@ def process_zoomsession_for_qna(supabase, row):
                 q_group,
             )
             #print(f"Response Content: {response_content}")
-            response_list.append({"qt":q_topic,"rc":response_content})
+            responses_by_group.setdefault(q_group, []).append({"qt":q_topic,"rc":response_content})
             log_qna_response(
                 session_id=session_id,
                 topic=topic,
@@ -152,7 +187,12 @@ def process_zoomsession_for_qna(supabase, row):
                 tags=["cron"],
             )
         supabase.update_zoomsession_status(session_id, "QnA Completed")
-        qna_email_out(topic,response_list)
+        for group, response_list in responses_by_group.items():
+            to_address=_resolve_qna_recipient(group, qna_email_map or {}, default_to_address)
+            if not to_address:
+                print(f"Skipping QnA email for group '{group}': no recipient configured.")
+                continue
+            qna_email_out(topic,response_list,group,to_address)
     except Exception as e:
         print(f"ERROR processing ZoomSession for QnA for session {session_id}: {e}")
 
@@ -161,18 +201,29 @@ def process_one_day_qna(supabase, date_str):
     INITIAL_STATUS="Initial"
     print(f"DEBUG: Fetching QnA for date: {date_str}")
     rows=supabase.get_zoomsession_status_date(INITIAL_STATUS,date_str)
+    qna_email_map=_load_qna_email_map(supabase)
+    default_address=os.environ.get("AGENTMAIL_TO_ADDRESS")
     
     print(f"DEBUG: Found {len(rows)} sessions with status {INITIAL_STATUS} for date {date_str}")
     if rows:
         with ThreadPoolExecutor(max_workers=5) as executor:
-            futures = [executor.submit(process_zoomsession_for_qna, supabase, row) for row in rows]
+            futures = [
+                executor.submit(
+                    process_zoomsession_for_qna,
+                    supabase,
+                    row,
+                    qna_email_map,
+                    default_address,
+                )
+                for row in rows
+            ]
             for future in as_completed(futures):
                 try:
                     future.result()
                 except Exception as e:
                     print(f"Error processing row: {e}")
         #for row in rows:
-        #    process_zoomsession_for_qna(supabase, row)
+        #    process_zoomsession_for_qna(supabase, row, qna_email_map, default_address)
     return rows
 
 def process_braintree(supabase,duration):
