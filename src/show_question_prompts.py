@@ -1,6 +1,8 @@
+import math
 import os
 from typing import List
 
+import pandas as pd
 import streamlit as st
 
 from utils.supabase_integration import SupabaseClient
@@ -8,6 +10,17 @@ from utils.supabase_integration import SupabaseClient
 DEFAULT_STATUS = "active"
 DEFAULT_PROMPT_GROUP = "common"
 EDITOR_ROLES = {"financeadmin", "superadmin"}
+
+
+def _coerce_int(value) -> int | None:
+    if value is None:
+        return None
+    if isinstance(value, float) and math.isnan(value):
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _build_client() -> SupabaseClient | None:
@@ -23,22 +36,41 @@ def _load_prompts(client: SupabaseClient, status: str) -> List[dict]:
         return client.list_question_prompts(status=status)
 
 
-def _render_prompt_filters(prompts: List[dict]) -> tuple[str, str, str]:
+def _render_prompt_filters(prompts: List[dict]) -> tuple[str, str]:
     groups = sorted({row.get("prompt_group", DEFAULT_PROMPT_GROUP) for row in prompts} - {""})
     filter_label = "All groups"
     options = [filter_label] + (groups or [DEFAULT_PROMPT_GROUP])
     selected = st.selectbox("Filter by prompt group", options)
-    current_group = selected if selected != filter_label else DEFAULT_PROMPT_GROUP
-    return selected, current_group, filter_label
+    return selected, filter_label
 
 
-def _render_prompt_table(prompts: List[dict], selected_group: str, filter_label: str) -> List[dict]:
+def _render_prompt_table(prompts: List[dict], selected_group: str, filter_label: str) -> tuple[List[dict], List[dict]]:
     filtered = [
         row for row in prompts if selected_group == filter_label or row.get("prompt_group") == selected_group
     ]
     st.caption(f"Showing {len(filtered)} prompts.")
-    st.dataframe(filtered)
-    return filtered
+    if not filtered:
+        st.info("No prompts yet. Add rows in the table below to create the first entry.")
+    filtered_df = pd.DataFrame(filtered)
+    required_columns = ["id", "title", "prompt", "prompt_group"]
+    for column in required_columns:
+        if column not in filtered_df:
+            filtered_df[column] = None if column == "id" else ""
+    editor_key = f"prompt_table_{selected_group}"
+    column_config = {
+        "id": st.column_config.NumberColumn("ID", disabled=True),
+    }
+    editor_value = st.data_editor(
+        filtered_df,
+        use_container_width=True,
+        hide_index=True,
+        key=editor_key,
+        disabled=False if _can_edit_prompts() else True,
+        column_config=column_config,
+        num_rows="dynamic" if _can_edit_prompts() else "fixed",
+    )
+    edited_rows = editor_value.to_dict("records")
+    return filtered, edited_rows
 
 
 def _user_role() -> str:
@@ -49,91 +81,85 @@ def _can_edit_prompts() -> bool:
     return _user_role() in EDITOR_ROLES
 
 
-def _render_prompt_form(client: SupabaseClient, default_group: str):
-    st.subheader("Add a new question prompt")
-    with st.form("new_question_prompt"):
-        title = st.text_input("New prompt title").strip()
-        prompt_body = st.text_area("New prompt body", height=150).strip()
-        prompt_group = st.text_input("New prompt group", value=default_group).strip() or DEFAULT_PROMPT_GROUP
-        submitted = st.form_submit_button("Save prompt")
+def _collect_prompt_changes(
+    original_rows: List[dict], edited_rows: List[dict]
+) -> tuple[List[tuple[int, dict]], List[dict], List[int]]:
+    original_map = {}
+    for row in original_rows:
+        row_id = _coerce_int(row.get("id"))
+        if row_id is not None:
+            original_map[row_id] = row
+    updates: List[tuple[int, dict]] = []
+    creations: List[dict] = []
+    invalid_rows: List[int] = []
+    for idx, row in enumerate(edited_rows):
+        prompt_id = _coerce_int(row.get("id"))
+        title_value = str(row.get("title") or "").strip()
+        prompt_value = str(row.get("prompt") or "").strip()
+        group_value = str(row.get("prompt_group") or DEFAULT_PROMPT_GROUP).strip() or DEFAULT_PROMPT_GROUP
+        if prompt_id and prompt_id in original_map:
+            original = original_map[prompt_id]
+            if (
+                title_value != str(original.get("title") or "").strip()
+                or prompt_value != str(original.get("prompt") or "").strip()
+                or group_value != str(original.get("prompt_group") or DEFAULT_PROMPT_GROUP).strip()
+            ):
+                updates.append(
+                    (
+                        prompt_id,
+                        {
+                            "title": title_value,
+                            "prompt": prompt_value,
+                            "prompt_group": group_value,
+                        },
+                    )
+                )
+        else:
+            if not title_value and not prompt_value:
+                continue
+            if not title_value or not prompt_value:
+                invalid_rows.append(idx + 1)
+                continue
+            creations.append(
+                {
+                    "title": title_value,
+                    "prompt": prompt_value,
+                    "prompt_group": group_value,
+                }
+            )
+    return updates, creations, invalid_rows
 
-    if not submitted:
-        return
-    if not title or not prompt_body:
-        st.error("Title and prompt are required.")
-        return
-    with st.spinner("Saving prompt..."):
-        inserted = client.insert_question_prompt(
-            title=title,
-            prompt=prompt_body,
-            prompt_group=prompt_group,
-            status=DEFAULT_STATUS,
-        )
-    if inserted:
-        st.success("Prompt saved.")
-        st.rerun()
-    else:
-        st.error("Unable to save prompt. Check logs for details.")
 
-
-def _render_prompt_editor(client: SupabaseClient, prompts: List[dict]):
+def _render_prompt_editor(client: SupabaseClient, original_rows: List[dict], edited_rows: List[dict]):
     if not _can_edit_prompts():
         return
-    editable = [row for row in prompts if row.get("id")]
-    st.subheader("Edit an existing prompt")
-    if not editable:
-        st.info("No prompts are available to edit yet.")
+    updates, creations, invalid_rows = _collect_prompt_changes(original_rows, edited_rows)
+    if invalid_rows:
+        st.error(f"Rows {', '.join(map(str, invalid_rows))} need both a title and prompt.")
         return
-    option_map = {
-        f"{row.get('title', '(untitled)')} · {row.get('prompt_group', DEFAULT_PROMPT_GROUP)} (#{row.get('id')})": row
-        for row in editable
-    }
-    option_labels = list(option_map.keys())
-    selected_label = st.selectbox("Select a prompt to edit", option_labels, key="prompt_edit_selector")
-    selected = option_map.get(selected_label)
-    if not selected:
+    if not updates and not creations:
+        st.caption("Update prompts inline or add new rows, then click save.")
         return
-    prompt_id = selected.get("id")
-    with st.form(f"edit_question_prompt_{prompt_id}"):
-        new_title = st.text_input(
-            "Updated title",
-            value=selected.get("title", ""),
-            key=f"edit_prompt_title_{prompt_id}",
-        )
-        new_prompt = st.text_area(
-            "Updated prompt",
-            value=selected.get("prompt", ""),
-            height=150,
-            key=f"edit_prompt_body_{prompt_id}",
-        )
-        new_group = st.text_input(
-            "Updated prompt group",
-            value=selected.get("prompt_group", DEFAULT_PROMPT_GROUP),
-            key=f"edit_prompt_group_{prompt_id}",
-        )
-        submitted = st.form_submit_button("Update prompt")
-    if not submitted:
-        return
-    title_value = new_title.strip()
-    prompt_value = new_prompt.strip()
-    group_value = new_group.strip() or DEFAULT_PROMPT_GROUP
-    if not title_value or not prompt_value:
-        st.error("Title and prompt are required.")
-        return
-    with st.spinner("Updating prompt..."):
-        updated = client.update_question_prompt(
-            prompt_id=prompt_id,
-            updates={
-                "title": title_value,
-                "prompt": prompt_value,
-                "prompt_group": group_value,
-            },
-        )
-    if updated:
-        st.success("Prompt updated.")
+    save_label = f"Save {len(updates) + len(creations)} change(s)"
+    if st.button(save_label, key="save_prompt_updates"):
+        with st.spinner("Saving prompt changes..."):
+            for prompt_id, payload in updates:
+                updated = client.update_question_prompt(prompt_id=prompt_id, updates=payload)
+                if not updated:
+                    st.error(f"Unable to update prompt #{prompt_id}.")
+                    return
+            for payload in creations:
+                inserted = client.insert_question_prompt(
+                    title=payload["title"],
+                    prompt=payload["prompt"],
+                    prompt_group=payload["prompt_group"],
+                    status=DEFAULT_STATUS,
+                )
+                if not inserted:
+                    st.error(f"Unable to add prompt '{payload['title']}'.")
+                    return
+        st.success("Prompts saved.")
         st.rerun()
-    else:
-        st.error("Unable to update prompt. Check logs for details.")
 
 
 def show_question_prompts_page():
@@ -144,7 +170,6 @@ def show_question_prompts_page():
         return
 
     prompts = _load_prompts(client, DEFAULT_STATUS)
-    selected_group, current_group, filter_label = _render_prompt_filters(prompts)
-    visible_prompts = _render_prompt_table(prompts, selected_group, filter_label)
-    _render_prompt_editor(client, visible_prompts)
-    _render_prompt_form(client, current_group)
+    selected_group, filter_label = _render_prompt_filters(prompts)
+    visible_prompts, edited_prompts = _render_prompt_table(prompts, selected_group, filter_label)
+    _render_prompt_editor(client, visible_prompts, edited_prompts)

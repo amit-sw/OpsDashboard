@@ -1,12 +1,25 @@
+import math
 import os
 from typing import List
 
+import pandas as pd
 import streamlit as st
 
 from utils.supabase_integration import SupabaseClient
 
 DEFAULT_PROMPT_GROUP = "common"
 ALLOWED_QNA_ROLES = {"financeadmin", "superadmin"}
+
+
+def _coerce_int(value) -> int | None:
+    if value is None:
+        return None
+    if isinstance(value, float) and math.isnan(value):
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _build_client() -> SupabaseClient | None:
@@ -51,86 +64,119 @@ def _load_qna_rows(client: SupabaseClient) -> List[dict]:
         return client.list_qna_emails()
 
 
-def _render_qna_table(rows: List[dict]):
+def _render_qna_table(rows: List[dict]) -> tuple[List[dict], List[dict]]:
     st.subheader("Current recipients")
-    if not rows:
-        st.info("No recipients have been added yet.")
-        return
+    table_df = pd.DataFrame(rows)
+    required_columns = ["id", "prompt_group", "email"]
+    for column in required_columns:
+        if column not in table_df:
+            table_df[column] = "" if column != "id" else None
     st.caption(f"Showing {len(rows)} rows.")
-    st.dataframe(rows)
+    if not rows:
+        st.info("No recipients yet. Add rows below to create the first entry.")
+    editor_value = st.data_editor(
+        table_df,
+        hide_index=True,
+        use_container_width=True,
+        key="qna_email_editor",
+        disabled=False if _can_manage_qna_emails() else True,
+        column_config={"id": st.column_config.NumberColumn("ID", disabled=True)},
+        num_rows="dynamic" if _can_manage_qna_emails() else "fixed",
+    )
+    edited_rows = editor_value.to_dict("records")
+    return rows, edited_rows
 
 
-def _render_new_recipient_form(client: SupabaseClient):
-    st.subheader("Add a recipient")
-    with st.form("create_qna_email"):
-        prompt_group = st.text_input("Prompt group", value=DEFAULT_PROMPT_GROUP)
-        email = st.text_input("Email address")
-        submitted = st.form_submit_button("Add recipient")
-    if not submitted:
+def _collect_qna_changes(
+    original_rows: List[dict], edited_rows: List[dict]
+) -> tuple[List[tuple[int, dict]], List[dict], List[int], List[int]]:
+    original_map = {}
+    for row in original_rows:
+        row_id = _coerce_int(row.get("id"))
+        if row_id is not None:
+            original_map[row_id] = row
+    updates: List[tuple[int, dict]] = []
+    creations: List[dict] = []
+    invalid_email_rows: List[int] = []
+    missing_email_rows: List[int] = []
+    for idx, row in enumerate(edited_rows):
+        record_id = _coerce_int(row.get("id"))
+        raw_group = str(row.get("prompt_group") or "")
+        group_value = _normalize_prompt_group(raw_group)
+        email_value_raw = row.get("email", "")
+        normalized_email = _normalize_email(email_value_raw)
+        if record_id and record_id in original_map:
+            original = original_map[record_id]
+            if (
+                group_value != _normalize_prompt_group(original.get("prompt_group", DEFAULT_PROMPT_GROUP))
+                or normalized_email != _normalize_email(original.get("email"))
+            ):
+                if not normalized_email:
+                    missing_email_rows.append(idx + 1)
+                    continue
+                valid_email = _validate_email(normalized_email)
+                if not valid_email:
+                    invalid_email_rows.append(idx + 1)
+                    continue
+                updates.append(
+                    (
+                        record_id,
+                        {
+                            "prompt_group": group_value,
+                            "email": valid_email,
+                        },
+                    )
+                )
+        else:
+            if not raw_group.strip() and not normalized_email:
+                continue
+            if not normalized_email:
+                missing_email_rows.append(idx + 1)
+                continue
+            validated_email = _validate_email(normalized_email)
+            if not validated_email:
+                invalid_email_rows.append(idx + 1)
+                continue
+            creations.append(
+                {
+                    "prompt_group": group_value or DEFAULT_PROMPT_GROUP,
+                    "email": validated_email,
+                }
+            )
+    return updates, creations, invalid_email_rows, missing_email_rows
+
+
+def _render_edit_recipient_form(client: SupabaseClient, original_rows: List[dict], edited_rows: List[dict]):
+    if not _can_manage_qna_emails():
         return
-    normalized_group = _normalize_prompt_group(prompt_group)
-    normalized_email = _validate_email(email)
-    if not normalized_email:
-        st.error("Enter a valid email address (example@example.com).")
+    updates, creations, invalid_rows, missing_rows = _collect_qna_changes(original_rows, edited_rows)
+    if missing_rows:
+        st.error(f"Rows {', '.join(map(str, missing_rows))} need an email address.")
         return
-    with st.spinner("Saving recipient..."):
-        inserted = client.insert_qna_email(
-            prompt_group=normalized_group,
-            email=normalized_email,
-        )
-    if inserted:
-        st.success("Recipient added.")
+    if invalid_rows:
+        st.error(f"Rows {', '.join(map(str, invalid_rows))} contain invalid email addresses.")
+        return
+    if not updates and not creations:
+        st.caption("Edit rows or add new recipients inline, then click save.")
+        return
+    save_label = f"Save {len(updates) + len(creations)} change(s)"
+    if st.button(save_label, key="save_qna_email_updates"):
+        with st.spinner("Saving QnA recipients..."):
+            for record_id, payload in updates:
+                updated = client.update_qna_email(record_id=record_id, updates=payload)
+                if not updated:
+                    st.error(f"Unable to update recipient #{record_id}.")
+                    return
+            for payload in creations:
+                inserted = client.insert_qna_email(
+                    prompt_group=payload["prompt_group"],
+                    email=payload["email"],
+                )
+                if not inserted:
+                    st.error(f"Unable to add recipient '{payload['email']}'.")
+                    return
+        st.success("Recipients saved.")
         st.rerun()
-    else:
-        st.error("Unable to add recipient. Check logs for details.")
-
-
-def _render_edit_recipient_form(client: SupabaseClient, rows: List[dict]):
-    editable = [row for row in rows if row.get("id")]
-    if not editable:
-        return
-    st.subheader("Edit an existing recipient")
-    options = {
-        f"{row.get('prompt_group', DEFAULT_PROMPT_GROUP)} · {row.get('email', '')} (#{row.get('id')})": row
-        for row in editable
-    }
-    label = st.selectbox("Select a recipient", list(options.keys()))
-    selected = options.get(label)
-    if not selected:
-        return
-    record_id = selected.get("id")
-    with st.form(f"edit_qna_email_{record_id}"):
-        updated_group = st.text_input(
-            "Prompt group",
-            value=selected.get("prompt_group", DEFAULT_PROMPT_GROUP),
-            key=f"edit_qna_group_{record_id}",
-        )
-        updated_email = st.text_input(
-            "Email address",
-            value=selected.get("email", ""),
-            key=f"edit_qna_email_{record_id}",
-        )
-        submitted = st.form_submit_button("Save changes")
-    if not submitted:
-        return
-    normalized_group = _normalize_prompt_group(updated_group)
-    normalized_email = _validate_email(updated_email)
-    if not normalized_email:
-        st.error("Enter a valid email address.")
-        return
-    with st.spinner("Updating recipient..."):
-        updated = client.update_qna_email(
-            record_id=record_id,
-            updates={
-                "prompt_group": normalized_group,
-                "email": normalized_email,
-            },
-        )
-    if updated:
-        st.success("Recipient updated.")
-        st.rerun()
-    else:
-        st.error("Unable to update recipient. Check logs for details.")
 
 
 def show_qna_emails_page():
@@ -143,6 +189,5 @@ def show_qna_emails_page():
         st.error("Supabase credentials are missing.")
         return
     rows = _load_qna_rows(client)
-    _render_qna_table(rows)
-    _render_edit_recipient_form(client, rows)
-    _render_new_recipient_form(client)
+    original_rows, edited_rows = _render_qna_table(rows)
+    _render_edit_recipient_form(client, original_rows, edited_rows)
