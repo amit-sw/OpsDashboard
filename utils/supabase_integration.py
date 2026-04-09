@@ -348,7 +348,12 @@ class SupabaseClient:
         
     def insert_gmail_index_records(self, rows):
         try:
-            response = self.supabase.table("gmail_message_index").insert(rows).execute()
+            response = (
+                self.supabase
+                .table("gmail_message_index")
+                .upsert(rows, on_conflict="id")
+                .execute()
+            )
             return response.data or []
         except Exception as e:
             print(f"Error creating instructor: {e}")
@@ -358,7 +363,12 @@ class SupabaseClient:
         # rows: [{id, thread_id, internal_ms, headers, snippet, body_full, raw_json}]
         if not rows:
             return
-        response=self.supabase.table("gmail_messages").insert(rows).execute()
+        response = (
+            self.supabase
+            .table("gmail_messages")
+            .upsert(rows, on_conflict="id")
+            .execute()
+        )
         return response
 
     def get_ids(self,ymd: str, fetch_bodies: bool = True):
