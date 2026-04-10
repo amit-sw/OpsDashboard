@@ -81,8 +81,38 @@ def test_backfill_index_for_date_range_reports_duplicate_stats(monkeypatch):
 
     assert stats == {
         "gmail_ids_found": 3,
+        "unique_ids_discovered": 2,
         "duplicates_in_scan": 1,
         "attempted_upserts": 2,
         "inserted": 1,
         "already_in_supabase": 1,
     }
+
+
+def test_list_ids_uses_page_token():
+    captured = {"tokens": []}
+
+    class DummyExecute:
+        def __init__(self):
+            self.calls = 0
+
+        def list(self, userId=None, q=None, maxResults=None, pageToken=None, includeSpamTrash=None):
+            captured["tokens"].append(pageToken)
+            return self
+
+        def execute(self):
+            if len(captured["tokens"]) == 1:
+                return {"messages": [{"id": "msg-1"}], "nextPageToken": "page-2"}
+            return {"messages": [{"id": "msg-2"}]}
+
+    class DummyUsers:
+        def messages(self):
+            return DummyExecute()
+
+    class DummyService:
+        def users(self):
+            return DummyUsers()
+
+    ids = list(gmail_backfill_ids._list_ids(DummyService(), "after:1 before:2", cap=200))
+    assert ids == ["msg-1", "msg-2"]
+    assert captured["tokens"] == [None, "page-2"]

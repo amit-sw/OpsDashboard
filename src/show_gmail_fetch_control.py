@@ -8,6 +8,7 @@ import streamlit as st
 
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 
 from utils.gmail_backfill_ids import backfill_index_for_date_range
 from utils.gmail_get_contents import fetch_and_store_messages_for_day
@@ -180,9 +181,16 @@ def show_gmail_fetch_control():
             "new_rows": 0,
             "already_present": 0,
             "attempted_upserts": 0,
+            "body_filled": 0,
+            "already_complete": 0,
         }
+        last_render = {"ts": 0.0}
 
-        def render_live_progress(current_stage: str, current_day: str = ""):
+        def render_live_progress(current_stage: str, current_day: str = "", force: bool = False):
+            now = time.time()
+            if not force and now - last_render["ts"] < 0.5:
+                return
+            last_render["ts"] = now
             elapsed = time.time() - run_started
             processed = max(cumulative["processed_messages"], cumulative["indexed_seen"], 0)
             total_target = max(coverage_totals["missing_messages"], coverage_totals["indexed_ids"], 1)
@@ -192,7 +200,7 @@ def show_gmail_fetch_control():
             m1, m2, m3, m4 = live_metrics.columns(4)
             m1.metric("Processed so far", processed)
             m2.metric("New rows", cumulative["new_rows"])
-            m3.metric("Already present", cumulative["already_present"])
+            m3.metric("Bodies filled", cumulative["body_filled"])
             m4.metric("ETA", eta)
             prefix = f"{current_day}: " if current_day else ""
             live_status.info(
@@ -204,24 +212,33 @@ def show_gmail_fetch_control():
                 live_table.dataframe(pd.DataFrame(live_rows), use_container_width=True, hide_index=True)
 
         def on_index_progress(payload):
-            cumulative["indexed_seen"] = payload.get("gmail_ids_found", cumulative["indexed_seen"])
+            cumulative["indexed_seen"] = payload.get("unique_ids_discovered", cumulative["indexed_seen"])
             cumulative["new_rows"] = payload.get("inserted", cumulative["new_rows"])
             cumulative["already_present"] = payload.get("already_in_supabase", cumulative["already_present"])
             cumulative["attempted_upserts"] = payload.get("attempted_upserts", cumulative["attempted_upserts"])
             overall_progress.progress(min(cumulative["indexed_seen"] / max(coverage_totals["indexed_ids"], 1), 0.25))
             render_live_progress("Discovering message ids")
 
-        with st.spinner("Discovering Gmail messages for the selected date range...", show_time=True):
-            index_stats = backfill_index_for_date_range(
-                service,
-                start_date,
-                end_date,
-                include_spam_trash=include_spam_trash,
-                progress_callback=on_index_progress,
+        try:
+            with st.spinner("Discovering Gmail messages for the selected date range...", show_time=True):
+                index_stats = backfill_index_for_date_range(
+                    service,
+                    start_date,
+                    end_date,
+                    include_spam_trash=include_spam_trash,
+                    progress_callback=on_index_progress,
+                )
+        except HttpError as exc:
+            live_status.error(
+                "Gmail returned an API error while discovering message ids. "
+                "Please retry with a smaller date range. "
+                f"Partial progress before failure: discovered {cumulative['indexed_seen']} unique ids."
             )
+            st.exception(exc)
+            return
         index_stats_placeholder.info(
             "Discovery finished. "
-            f"Found {index_stats['gmail_ids_found']} Gmail ids, "
+            f"Found {index_stats['unique_ids_discovered']} unique Gmail ids, "
             f"inserted {index_stats['inserted']} new index rows, "
             f"skipped {index_stats['already_in_supabase']} already in Supabase, "
             f"and ignored {index_stats['duplicates_in_scan']} duplicates within the scan."
@@ -230,6 +247,8 @@ def show_gmail_fetch_control():
         total_attempted = 0
         total_inserted = 0
         total_existing = 0
+        total_body_filled = 0
+        total_already_complete = 0
         total_indexed = 0
         day_rows = []
         for idx, ymd in enumerate(_iter_ymd_range(start_date, end_date), start=1):
@@ -239,55 +258,72 @@ def show_gmail_fetch_control():
                 "processed_messages": 0,
                 "attempted_upserts": 0,
                 "new_rows": 0,
-                "already_present": 0,
+                "body_filled": 0,
+                "already_complete": 0,
             }
             day_rows.append(current_row)
+            live_rows[:] = day_rows
 
             def on_fetch_progress(payload, row=current_row):
                 row["indexed_ids"] = payload.get("indexed_for_day", row["indexed_ids"])
                 row["processed_messages"] = payload.get("processed_messages", row["processed_messages"])
                 row["attempted_upserts"] = payload.get("attempted_upserts", row["attempted_upserts"])
                 row["new_rows"] = payload.get("inserted", row["new_rows"])
-                row["already_present"] = payload.get("already_in_supabase", row["already_present"])
+                row["body_filled"] = payload.get("body_filled", row["body_filled"])
+                row["already_complete"] = payload.get("already_complete", row["already_complete"])
                 cumulative["processed_messages"] = total_indexed + row["processed_messages"]
                 cumulative["new_rows"] = total_inserted + row["new_rows"]
-                cumulative["already_present"] = total_existing + row["already_present"]
+                cumulative["body_filled"] = total_body_filled + row["body_filled"]
+                cumulative["already_complete"] = total_already_complete + row["already_complete"]
                 cumulative["attempted_upserts"] = total_attempted + row["attempted_upserts"]
                 progress_fraction = (idx - 1 + (row["processed_messages"] / max(row["indexed_ids"], 1))) / max(total_days, 1)
                 overall_progress.progress(max(0.25, min(progress_fraction, 1.0)))
                 render_live_progress("Fetching message content", current_day=ymd)
 
-            with st.spinner(f"For {ymd}", show_time=True):
-                fetch_stats = fetch_and_store_messages_for_day(
-                    supabase,
-                    service,
-                    ymd,
-                    fetch_bodies,
-                    progress_callback=on_fetch_progress,
+            try:
+                with st.spinner(f"For {ymd}", show_time=True):
+                    fetch_stats = fetch_and_store_messages_for_day(
+                        supabase,
+                        service,
+                        ymd,
+                        fetch_bodies,
+                        progress_callback=on_fetch_progress,
+                    )
+            except HttpError as exc:
+                live_status.error(
+                    f"Gmail returned an API error while fetching message content for {ymd}. "
+                    f"Completed {total_indexed + current_row['processed_messages']} messages before failure."
                 )
+                st.exception(exc)
+                return
             total_indexed += fetch_stats["indexed_for_day"]
             total_attempted += fetch_stats["attempted_upserts"]
             total_inserted += fetch_stats["inserted"]
             total_existing += fetch_stats["already_in_supabase"]
+            total_body_filled += fetch_stats["body_filled"]
+            total_already_complete += fetch_stats["already_complete"]
             current_row.update(
                 {
                     "indexed_ids": fetch_stats["indexed_for_day"],
                     "processed_messages": fetch_stats["processed_messages"],
                     "attempted_upserts": fetch_stats["attempted_upserts"],
                     "new_rows": fetch_stats["inserted"],
-                    "already_present": fetch_stats["already_in_supabase"],
+                    "body_filled": fetch_stats["body_filled"],
+                    "already_complete": fetch_stats["already_complete"],
                 }
             )
             cumulative["processed_messages"] = total_indexed
             cumulative["new_rows"] = total_inserted
-            cumulative["already_present"] = total_existing
+            cumulative["body_filled"] = total_body_filled
+            cumulative["already_complete"] = total_already_complete
             cumulative["attempted_upserts"] = total_attempted
             overall_progress.progress(idx / max(total_days, 1))
-            render_live_progress("Finished day", current_day=ymd)
+            render_live_progress("Finished day", current_day=ymd, force=True)
         live_status.success(f"Finished fetching indexed Gmail messages for {total_days} day(s).")
         st.success(
             f"Processed {total_indexed} indexed ids across {total_days} day(s): "
-            f"{total_inserted} new rows written, {total_existing} already present, "
+            f"{total_inserted} new rows written, {total_body_filled} existing rows enriched with bodies, "
+            f"{total_already_complete} rows already complete, "
             f"{total_attempted} total upserts attempted."
         )
         with st.expander("Per-day fetch results", expanded=True):
