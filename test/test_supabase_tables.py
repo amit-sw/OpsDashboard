@@ -189,6 +189,64 @@ def test_update_qna_email_filters_by_id():
     assert captured["filters"] == [("id", 99)]
 
 
+def test_insert_gmail_index_records_upserts_on_id():
+    captured = {}
+
+    class FakeUpsertQuery:
+        def upsert(self, payload, on_conflict=None):
+            captured["payload"] = payload
+            captured["on_conflict"] = on_conflict
+            return self
+
+        def execute(self):
+            return SimpleNamespace(data=captured["payload"])
+
+    class FakeSupabase:
+        def table(self, name):
+            captured["table"] = name
+            return FakeUpsertQuery()
+
+    client = SupabaseClient.__new__(SupabaseClient)
+    client.supabase = FakeSupabase()
+
+    rows = [{"id": "msg-1", "thread_id": "thread-1", "internal_ms": 1, "ymd": "2025-04-01"}]
+    response = client.insert_gmail_index_records(rows)
+
+    assert response == rows
+    assert captured["table"] == "gmail_message_index"
+    assert captured["payload"] == rows
+    assert captured["on_conflict"] == "id"
+
+
+def test_insert_messages_batch_upserts_on_id():
+    captured = {}
+
+    class FakeUpsertQuery:
+        def upsert(self, payload, on_conflict=None):
+            captured["payload"] = payload
+            captured["on_conflict"] = on_conflict
+            return self
+
+        def execute(self):
+            return SimpleNamespace(data=captured["payload"])
+
+    class FakeSupabase:
+        def table(self, name):
+            captured["table"] = name
+            return FakeUpsertQuery()
+
+    client = SupabaseClient.__new__(SupabaseClient)
+    client.supabase = FakeSupabase()
+
+    rows = [{"id": "msg-1", "thread_id": "thread-1", "snippet": "hello"}]
+    response = client.insert_messages_batch(rows)
+
+    assert response.data == rows
+    assert captured["table"] == "gmail_messages"
+    assert captured["payload"] == rows
+    assert captured["on_conflict"] == "id"
+
+
 def test_get_braintree_formatted_last_n_days_only_includes_settled(monkeypatch):
     client = SupabaseClient.__new__(SupabaseClient)
 

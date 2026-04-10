@@ -116,6 +116,7 @@ def show_ui_superadmin(user):
     pages = {
         "SuperAdmin": [
             st.Page(show_gmail_creds_page, title="GMail Creds"),
+            st.Page(show_gmail_fetch_control, title="GMail Fetch"),
         ],
         "Super-Calendar": [
             st.Page(show_student_email_calendar, title="Calendar"),
