@@ -67,6 +67,35 @@ def _gmail_range_coverage(supabase: SupabaseClient, start_date: date, end_date: 
     return df, totals
 
 
+def _gmail_messages_for_range(supabase: SupabaseClient, start_date: date, end_date: date):
+    index_rows = supabase.list_gmail_index_rows_by_range(start_date.isoformat(), end_date.isoformat())
+    if not index_rows:
+        return pd.DataFrame()
+    ymd_by_id = {
+        row.get("id"): str(row.get("ymd") or "")
+        for row in index_rows
+        if row.get("id")
+    }
+    message_rows = supabase.list_gmail_messages_by_ids(list(ymd_by_id.keys()))
+    display_rows = []
+    for row in message_rows:
+        headers = row.get("headers") or {}
+        display_rows.append(
+            {
+                "date": ymd_by_id.get(row.get("id"), ""),
+                "from": headers.get("From", ""),
+                "to": headers.get("To", ""),
+                "subject": headers.get("Subject", ""),
+                "snippet": row.get("snippet", ""),
+                "body_full": row.get("body_full", ""),
+            }
+        )
+    if not display_rows:
+        return pd.DataFrame()
+    df = pd.DataFrame(display_rows)
+    return df.sort_values(by=["date", "subject"], ascending=[True, True]).reset_index(drop=True)
+
+
 def show_gmail_fetch_control():
     st.title("GMAIL Fetch control")
     supabase = SupabaseClient(os.getenv('SUPABASE_URL'),os.getenv('SUPABASE_KEY'))
@@ -85,7 +114,7 @@ def show_gmail_fetch_control():
     default_end = date.today()
     default_start = default_end - timedelta(days=6)
 
-    st.caption("Backfill Gmail message IDs and fetch full message content into Supabase for any date range.")
+    st.caption("Choose a date range, then either pull Gmail into Supabase or review what is already stored there.")
     start_date = st.date_input("Start date", value=default_start)
     end_date = st.date_input("End date", value=default_end)
     include_spam_trash = st.checkbox("Include Spam and Trash", value=False)
@@ -106,22 +135,26 @@ def show_gmail_fetch_control():
     metric4.metric("Days Without Index", coverage_totals["days_without_index"])
 
     with st.expander("Coverage for selected date range", expanded=True):
-        st.caption("Use this to decide whether you need to backfill the Gmail index, fetch message bodies, or both.")
+        st.caption("This shows what is already indexed and fetched in Supabase for the selected dates.")
         st.dataframe(coverage_df, use_container_width=True, hide_index=True)
 
     service = gmail_service(creds)
-    col1, col2, col3 = st.columns(3)
+    st.markdown("**Actions**")
+    action_col1, action_col2 = st.columns(2)
 
-    with col1:
-        run_index = st.button("Backfill Gmail index", use_container_width=True)
-    with col2:
-        run_fetch = st.button("Fetch indexed emails", use_container_width=True)
-    with col3:
-        run_both = st.button("Backfill and fetch", use_container_width=True, type="primary")
+    with action_col1:
+        st.caption("Fetch from Gmail and store in Supabase")
+        st.caption("Discovers message IDs for the selected dates, then saves the matching email content into the database.")
+        run_sync = st.button("Sync Gmail to database", use_container_width=True, type="primary")
 
-    if run_index or run_both:
+    with action_col2:
+        st.caption("Show what is already in Supabase")
+        st.caption("Loads email rows already stored in the database for the selected date range without calling Gmail.")
+        run_show_db = st.button("Show stored database messages", use_container_width=True)
+
+    if run_sync:
         index_stats_placeholder = st.empty()
-        with st.spinner("Backfilling Gmail message index...", show_time=True):
+        with st.spinner("Discovering Gmail messages for the selected date range...", show_time=True):
             index_stats = backfill_index_for_date_range(
                 service,
                 start_date,
@@ -129,15 +162,13 @@ def show_gmail_fetch_control():
                 include_spam_trash=include_spam_trash,
             )
         index_stats_placeholder.info(
-            "Index backfill finished. "
+            "Discovery finished. "
             f"Found {index_stats['gmail_ids_found']} Gmail ids, "
             f"inserted {index_stats['inserted']} new index rows, "
             f"skipped {index_stats['already_in_supabase']} already in Supabase, "
             f"and ignored {index_stats['duplicates_in_scan']} duplicates within the scan."
         )
-        st.success("Gmail message index updated.")
 
-    if run_fetch or run_both:
         total_attempted = 0
         total_inserted = 0
         total_existing = 0
@@ -159,7 +190,7 @@ def show_gmail_fetch_control():
                     "indexed_ids": fetch_stats["indexed_for_day"],
                     "attempted_upserts": fetch_stats["attempted_upserts"],
                     "new_rows": fetch_stats["inserted"],
-                    "already_present": fetch_stats["already_in_supabase"],
+                    "already_present": fetch_stats["already_in_supabase"]
                 }
             )
             status.write(
@@ -176,4 +207,10 @@ def show_gmail_fetch_control():
         with st.expander("Per-day fetch results", expanded=True):
             st.dataframe(pd.DataFrame(day_rows), use_container_width=True, hide_index=True)
 
-    
+    if run_show_db:
+        stored_df = _gmail_messages_for_range(supabase, start_date, end_date)
+        if stored_df.empty:
+            st.info("No stored Gmail messages were found in Supabase for this date range yet.")
+        else:
+            st.success(f"Loaded {len(stored_df)} stored Gmail messages from Supabase.")
+            st.dataframe(stored_df, use_container_width=True, hide_index=True)
