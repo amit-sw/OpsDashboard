@@ -59,8 +59,15 @@ def _ymd_from_ms(internal_ms: int) -> str:
 def _upsert_index_batch(rows: List[Dict[str, Any]]):
     # rows: [{id, thread_id, internal_ms, ymd}]
     if not rows:
-        return
+        return {"attempted": 0, "inserted": 0, "existing": 0}
+    existing_ids = supabase.get_existing_gmail_index_ids([row["id"] for row in rows])
     supabase.insert_gmail_index_records(rows)
+    existing_count = len(existing_ids)
+    return {
+        "attempted": len(rows),
+        "inserted": len(rows) - existing_count,
+        "existing": existing_count,
+    }
 
 def backfill_index_for_date_range(
     service,
@@ -72,15 +79,24 @@ def backfill_index_for_date_range(
     start = datetime.combine(start_date, datetime.min.time(), tzinfo=timezone.utc)
     end = datetime.combine(end_date + timedelta(days=1), datetime.min.time(), tzinfo=timezone.utc)
     seen: set[str] = set()             # in-memory dedupe across windows (idempotent if rerun)
+    stats = {
+        "gmail_ids_found": 0,
+        "duplicates_in_scan": 0,
+        "attempted_upserts": 0,
+        "inserted": 0,
+        "already_in_supabase": 0,
+    }
     for after_ts, before_ts in _windows(start, end, window_days):
         q = f"after:{after_ts} before:{before_ts}"   # whole mailbox (Inbox+Sent; Spam/Trash excluded unless flag)
         ids = list(_list_ids(service, q, cap=1000, include_spam_trash=include_spam_trash))
+        stats["gmail_ids_found"] += len(ids)
         if not ids:
             continue
 
         batch: List[Dict[str, Any]] = []
         for mid in ids:
             if mid in seen:
+                stats["duplicates_in_scan"] += 1
                 continue
             seen.add(mid)
             meta = _get_meta(service, mid)
@@ -94,10 +110,17 @@ def backfill_index_for_date_range(
             })
             # flush periodically to keep memory small
             if len(batch) >= 200:
-                _upsert_index_batch(batch)
+                batch_stats = _upsert_index_batch(batch)
+                stats["attempted_upserts"] += batch_stats["attempted"]
+                stats["inserted"] += batch_stats["inserted"]
+                stats["already_in_supabase"] += batch_stats["existing"]
                 batch.clear()
 
-        _upsert_index_batch(batch)  # flush remainder
+        batch_stats = _upsert_index_batch(batch)  # flush remainder
+        stats["attempted_upserts"] += batch_stats["attempted"]
+        stats["inserted"] += batch_stats["inserted"]
+        stats["already_in_supabase"] += batch_stats["existing"]
+    return stats
 
 # ---- STEP 1: backfill index for last 6 months ----
 def backfill_index_last_six_months(service, window_days: int = 4, include_spam_trash: bool = False):

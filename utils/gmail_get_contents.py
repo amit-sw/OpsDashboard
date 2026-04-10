@@ -8,9 +8,15 @@ from utils.supabase_integration import SupabaseClient
 def _insert_messages_batch(supabase, rows: List[Dict[str, Any]]):
     # rows: [{id, thread_id, internal_ms, headers, snippet, body_full, raw_json}]
     if not rows:
-        return
+        return {"attempted": 0, "inserted": 0, "existing": 0}
+    existing_ids = supabase.get_existing_gmail_message_ids([row["id"] for row in rows])
     response=supabase.insert_messages_batch(rows)
-    return response
+    existing_count = len(existing_ids)
+    return {
+        "attempted": len(rows),
+        "inserted": len(rows) - existing_count,
+        "existing": existing_count,
+    }
 
 def fetch_and_store_messages_for_day(supabase, service, ymd: str, fetch_bodies: bool = True):
     """
@@ -21,7 +27,12 @@ def fetch_and_store_messages_for_day(supabase, service, ymd: str, fetch_bodies: 
     ids = supabase.get_ids(ymd, fetch_bodies)
 
     batch: List[Dict[str, Any]] = []
-    count = 0
+    stats = {
+        "indexed_for_day": len(ids),
+        "attempted_upserts": 0,
+        "inserted": 0,
+        "already_in_supabase": 0,
+    }
     for row in ids:
         mid = row["id"]
         # fetch full or metadata depending on your needs
@@ -74,10 +85,14 @@ def fetch_and_store_messages_for_day(supabase, service, ymd: str, fetch_bodies: 
 
         batch.append(payload)
         if len(batch) >= 100:
-            _insert_messages_batch(supabase,batch)
-            count += len(batch)
+            batch_stats = _insert_messages_batch(supabase,batch)
+            stats["attempted_upserts"] += batch_stats["attempted"]
+            stats["inserted"] += batch_stats["inserted"]
+            stats["already_in_supabase"] += batch_stats["existing"]
             batch.clear()
 
-    _insert_messages_batch(supabase,batch)
-    count += len(batch)
-    return count
+    batch_stats = _insert_messages_batch(supabase,batch)
+    stats["attempted_upserts"] += batch_stats["attempted"]
+    stats["inserted"] += batch_stats["inserted"]
+    stats["already_in_supabase"] += batch_stats["existing"]
+    return stats
