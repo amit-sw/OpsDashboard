@@ -20,12 +20,7 @@ def test_backfill_index_for_date_range_uses_requested_window(monkeypatch):
     monkeypatch.setattr(
         gmail_backfill_ids,
         "_list_ids",
-        lambda service, q, cap=1000, include_spam_trash=False: captured["queries"].append((q, include_spam_trash)) or ["msg-1"],
-    )
-    monkeypatch.setattr(
-        gmail_backfill_ids,
-        "_get_meta",
-        lambda service, msg_id: {"threadId": "thread-1", "internalDate": "1704067200000"},
+        lambda service, q, cap=1000, include_spam_trash=False: captured["queries"].append((q, include_spam_trash)) or [{"id": "msg-1", "thread_id": "thread-1"}],
     )
     monkeypatch.setattr(
         gmail_backfill_ids,
@@ -45,8 +40,8 @@ def test_backfill_index_for_date_range_uses_requested_window(monkeypatch):
         {
             "id": "msg-1",
             "thread_id": "thread-1",
-            "internal_ms": 1704067200000,
-            "ymd": "2024-01-01",
+            "internal_ms": gmail_backfill_ids._bucket_internal_ms(date(1970, 1, 1)),
+            "ymd": "1970-01-01",
         }
     ]
 
@@ -60,12 +55,11 @@ def test_backfill_index_for_date_range_reports_duplicate_stats(monkeypatch):
     monkeypatch.setattr(
         gmail_backfill_ids,
         "_list_ids",
-        lambda service, q, cap=1000, include_spam_trash=False: ["msg-1", "msg-1", "msg-2"],
-    )
-    monkeypatch.setattr(
-        gmail_backfill_ids,
-        "_get_meta",
-        lambda service, msg_id: {"threadId": f"thread-{msg_id}", "internalDate": "1704067200000"},
+        lambda service, q, cap=1000, include_spam_trash=False: [
+            {"id": "msg-1", "thread_id": "thread-msg-1"},
+            {"id": "msg-1", "thread_id": "thread-msg-1"},
+            {"id": "msg-2", "thread_id": "thread-msg-2"},
+        ],
     )
     monkeypatch.setattr(
         gmail_backfill_ids,
@@ -102,8 +96,8 @@ def test_list_ids_uses_page_token():
 
         def execute(self):
             if len(captured["tokens"]) == 1:
-                return {"messages": [{"id": "msg-1"}], "nextPageToken": "page-2"}
-            return {"messages": [{"id": "msg-2"}]}
+                return {"messages": [{"id": "msg-1", "threadId": "thread-1"}], "nextPageToken": "page-2"}
+            return {"messages": [{"id": "msg-2", "threadId": "thread-2"}]}
 
     class DummyUsers:
         def messages(self):
@@ -114,5 +108,8 @@ def test_list_ids_uses_page_token():
             return DummyUsers()
 
     ids = list(gmail_backfill_ids._list_ids(DummyService(), "after:1 before:2", cap=200))
-    assert ids == ["msg-1", "msg-2"]
+    assert ids == [
+        {"id": "msg-1", "thread_id": "thread-1"},
+        {"id": "msg-2", "thread_id": "thread-2"},
+    ]
     assert captured["tokens"] == [None, "page-2"]

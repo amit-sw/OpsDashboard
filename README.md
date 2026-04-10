@@ -21,6 +21,31 @@ Some key files:
 - `scripts/seed_question_prompts.py` seeds the `question_prompts` Supabase table so `utils/prompts.py` can load question templates dynamically.
 - `helpers/seed_question_prompts.sql` provides direct SQL inserts for the default prompt rows when applying migrations manually.
 
+## Gmail Sync Notes
+
+The Gmail sync flow is intentionally split into two stages:
+
+1. Discovery / indexing
+2. Fetch / hydration
+
+Discovery is designed to stay lightweight. During discovery, the app stores
+only:
+
+- `id`
+- `thread_id` when Gmail includes it in `messages.list(...)`
+- `ymd` from the scanned date bucket
+- a synthetic `internal_ms` anchored to the start of that `ymd`
+
+Tradeoff:
+- Discovery does **not** call `messages.get(..., format="metadata")` for every
+  message.
+- This means the index step does not know the exact Gmail `internalDate` yet.
+- We intentionally accept that tradeoff because per-message metadata fetches
+  make discovery much slower and much more expensive.
+
+The exact payload, exact `internalDate`, headers, snippet, and `body_full` are
+fetched later during hydration when rows are written to `gmail_messages`.
+
 ## Testing
 
 Install dependencies with `pip install -r requirements.txt` and run `pytest` to execute the automated checks. The `test/` suite now covers PDF upload handling alongside the existing utility tests.
