@@ -30,7 +30,7 @@ def test_backfill_index_for_date_range_uses_requested_window(monkeypatch):
     monkeypatch.setattr(
         gmail_backfill_ids,
         "_upsert_index_batch",
-        lambda rows: captured["rows"].extend(rows),
+        lambda rows: captured["rows"].extend(rows) or {"attempted": len(rows), "inserted": len(rows), "existing": 0},
     )
 
     gmail_backfill_ids.backfill_index_for_date_range(
@@ -49,3 +49,40 @@ def test_backfill_index_for_date_range_uses_requested_window(monkeypatch):
             "ymd": "2024-01-01",
         }
     ]
+
+
+def test_backfill_index_for_date_range_reports_duplicate_stats(monkeypatch):
+    monkeypatch.setattr(
+        gmail_backfill_ids,
+        "_windows",
+        lambda start, end, window_days: [(100, 200)],
+    )
+    monkeypatch.setattr(
+        gmail_backfill_ids,
+        "_list_ids",
+        lambda service, q, cap=1000, include_spam_trash=False: ["msg-1", "msg-1", "msg-2"],
+    )
+    monkeypatch.setattr(
+        gmail_backfill_ids,
+        "_get_meta",
+        lambda service, msg_id: {"threadId": f"thread-{msg_id}", "internalDate": "1704067200000"},
+    )
+    monkeypatch.setattr(
+        gmail_backfill_ids,
+        "_upsert_index_batch",
+        lambda rows: {"attempted": len(rows), "inserted": 1, "existing": len(rows) - 1},
+    )
+
+    stats = gmail_backfill_ids.backfill_index_for_date_range(
+        service=object(),
+        start_date=date(2026, 1, 1),
+        end_date=date(2026, 1, 7),
+    )
+
+    assert stats == {
+        "gmail_ids_found": 3,
+        "duplicates_in_scan": 1,
+        "attempted_upserts": 2,
+        "inserted": 1,
+        "already_in_supabase": 1,
+    }

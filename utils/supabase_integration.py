@@ -380,6 +380,63 @@ class SupabaseClient:
         response = self.supabase.table("gmail_message_index").select("id, thread_id, internal_ms").eq("ymd", ymd).order("internal_ms", desc=False).execute()
         ids=response.data or []
         return ids
+
+    def get_existing_gmail_index_ids(self, ids):
+        if not self.supabase or not ids:
+            return set()
+        found = set()
+        try:
+            for start in range(0, len(ids), 500):
+                chunk = ids[start:start + 500]
+                response = (
+                    self.supabase
+                    .table("gmail_message_index")
+                    .select("id")
+                    .in_("id", chunk)
+                    .execute()
+                )
+                found.update(row.get("id") for row in (response.data or []) if row.get("id"))
+        except Exception as e:
+            print(f"Error fetching existing gmail index ids: {e}")
+        return found
+
+    def get_existing_gmail_message_ids(self, ids):
+        if not self.supabase or not ids:
+            return set()
+        found = set()
+        try:
+            for start in range(0, len(ids), 500):
+                chunk = ids[start:start + 500]
+                response = (
+                    self.supabase
+                    .table("gmail_messages")
+                    .select("id")
+                    .in_("id", chunk)
+                    .execute()
+                )
+                found.update(row.get("id") for row in (response.data or []) if row.get("id"))
+        except Exception as e:
+            print(f"Error fetching existing gmail message ids: {e}")
+        return found
+
+    def list_gmail_index_rows_by_range(self, start_ymd: str, end_ymd: str):
+        if not self.supabase:
+            return []
+        try:
+            response = (
+                self.supabase
+                .table("gmail_message_index")
+                .select("id, ymd")
+                .gte("ymd", start_ymd)
+                .lte("ymd", end_ymd)
+                .order("ymd")
+                .order("internal_ms")
+                .execute()
+            )
+            return response.data or []
+        except Exception as e:
+            print(f"Error listing gmail index rows by range: {e}")
+            return []
 #
 # For downnload zoom session information from AWS
 #
