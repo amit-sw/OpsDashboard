@@ -437,6 +437,27 @@ class SupabaseClient:
         except Exception as e:
             print(f"Error listing gmail index rows by range: {e}")
             return []
+
+    def list_gmail_messages_by_ids(self, ids):
+        if not self.supabase or not ids:
+            return []
+        rows = []
+        try:
+            for start in range(0, len(ids), 500):
+                chunk = ids[start:start + 500]
+                response = (
+                    self.supabase
+                    .table("gmail_messages")
+                    .select("id, thread_id, internal_ms, headers, snippet, body_full")
+                    .in_("id", chunk)
+                    .order("internal_ms")
+                    .execute()
+                )
+                rows.extend(response.data or [])
+        except Exception as e:
+            print(f"Error listing gmail messages by ids: {e}")
+            return []
+        return rows
 #
 # For downnload zoom session information from AWS
 #

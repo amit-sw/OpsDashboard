@@ -75,6 +75,7 @@ def backfill_index_for_date_range(
     end_date: date,
     window_days: int = 4,
     include_spam_trash: bool = False,
+    progress_callback=None,
 ):
     start = datetime.combine(start_date, datetime.min.time(), tzinfo=timezone.utc)
     end = datetime.combine(end_date + timedelta(days=1), datetime.min.time(), tzinfo=timezone.utc)
@@ -90,6 +91,18 @@ def backfill_index_for_date_range(
         q = f"after:{after_ts} before:{before_ts}"   # whole mailbox (Inbox+Sent; Spam/Trash excluded unless flag)
         ids = list(_list_ids(service, q, cap=1000, include_spam_trash=include_spam_trash))
         stats["gmail_ids_found"] += len(ids)
+        if progress_callback:
+            progress_callback(
+                {
+                    "stage": "scan_window",
+                    "window_query": q,
+                    "gmail_ids_found": stats["gmail_ids_found"],
+                    "duplicates_in_scan": stats["duplicates_in_scan"],
+                    "attempted_upserts": stats["attempted_upserts"],
+                    "inserted": stats["inserted"],
+                    "already_in_supabase": stats["already_in_supabase"],
+                }
+            )
         if not ids:
             continue
 
@@ -114,12 +127,36 @@ def backfill_index_for_date_range(
                 stats["attempted_upserts"] += batch_stats["attempted"]
                 stats["inserted"] += batch_stats["inserted"]
                 stats["already_in_supabase"] += batch_stats["existing"]
+                if progress_callback:
+                    progress_callback(
+                        {
+                            "stage": "index_batch",
+                            "batch_attempted": batch_stats["attempted"],
+                            "gmail_ids_found": stats["gmail_ids_found"],
+                            "duplicates_in_scan": stats["duplicates_in_scan"],
+                            "attempted_upserts": stats["attempted_upserts"],
+                            "inserted": stats["inserted"],
+                            "already_in_supabase": stats["already_in_supabase"],
+                        }
+                    )
                 batch.clear()
 
         batch_stats = _upsert_index_batch(batch)  # flush remainder
         stats["attempted_upserts"] += batch_stats["attempted"]
         stats["inserted"] += batch_stats["inserted"]
         stats["already_in_supabase"] += batch_stats["existing"]
+        if progress_callback and batch_stats["attempted"]:
+            progress_callback(
+                {
+                    "stage": "index_batch",
+                    "batch_attempted": batch_stats["attempted"],
+                    "gmail_ids_found": stats["gmail_ids_found"],
+                    "duplicates_in_scan": stats["duplicates_in_scan"],
+                    "attempted_upserts": stats["attempted_upserts"],
+                    "inserted": stats["inserted"],
+                    "already_in_supabase": stats["already_in_supabase"],
+                }
+            )
     return stats
 
 # ---- STEP 1: backfill index for last 6 months ----
