@@ -111,6 +111,14 @@ def _format_eta(seconds_remaining: float):
     return f"{seconds}s"
 
 
+def _render_stage_metrics(container, metrics):
+    m1, m2, m3, m4 = container.columns(4)
+    m1.metric(metrics["label_1"], metrics["value_1"])
+    m2.metric(metrics["label_2"], metrics["value_2"])
+    m3.metric(metrics["label_3"], metrics["value_3"])
+    m4.metric(metrics["label_4"], metrics["value_4"])
+
+
 def show_gmail_fetch_control():
     st.title("GMAIL Fetch control")
     supabase = SupabaseClient(os.getenv('SUPABASE_URL'),os.getenv('SUPABASE_KEY'))
@@ -170,17 +178,18 @@ def show_gmail_fetch_control():
     if run_sync:
         run_started = time.time()
         index_stats_placeholder = st.empty()
+        stage_banner = st.empty()
         live_metrics = st.empty()
         live_status = st.empty()
         live_table = st.empty()
         overall_progress = st.progress(0.0)
         live_rows = []
         cumulative = {
-            "indexed_seen": 0,
-            "processed_messages": 0,
-            "new_rows": 0,
-            "already_present": 0,
-            "attempted_upserts": 0,
+            "ids_discovered": 0,
+            "new_index_rows": 0,
+            "existing_index_rows": 0,
+            "messages_fetched": 0,
+            "new_message_rows": 0,
             "body_filled": 0,
             "already_complete": 0,
         }
@@ -192,32 +201,75 @@ def show_gmail_fetch_control():
                 return
             last_render["ts"] = now
             elapsed = time.time() - run_started
-            processed = max(cumulative["processed_messages"], cumulative["indexed_seen"], 0)
-            total_target = max(coverage_totals["missing_messages"], coverage_totals["indexed_ids"], 1)
-            rate = processed / elapsed if elapsed > 0 else 0
-            remaining = max(total_target - processed, 0)
-            eta = _format_eta(remaining / rate) if rate > 0 else "estimating..."
-            m1, m2, m3, m4 = live_metrics.columns(4)
-            m1.metric("Processed so far", processed)
-            m2.metric("New rows", cumulative["new_rows"])
-            m3.metric("Bodies filled", cumulative["body_filled"])
-            m4.metric("ETA", eta)
             prefix = f"{current_day}: " if current_day else ""
-            live_status.info(
-                f"{prefix}{current_stage}. "
-                f"Processed {processed} items so far in {int(elapsed)}s. "
-                f"Estimated time remaining: {eta}."
-            )
+
+            if current_stage == "discovery":
+                processed = cumulative["ids_discovered"]
+                total_target = max(coverage_totals["indexed_ids"], processed, 1)
+                stage_banner.info("Step 1 of 2: Discovering Gmail IDs")
+                if processed >= 25 and elapsed > 0:
+                    rate = processed / elapsed
+                    remaining = max(total_target - processed, 0)
+                    eta = _format_eta(remaining / rate) if rate > 0 else "estimating..."
+                else:
+                    eta = "calculating..."
+                _render_stage_metrics(
+                    live_metrics,
+                    {
+                        "label_1": "Unique IDs discovered",
+                        "value_1": processed,
+                        "label_2": "New index rows",
+                        "value_2": cumulative["new_index_rows"],
+                        "label_3": "Already indexed",
+                        "value_3": cumulative["existing_index_rows"],
+                        "label_4": "Discovery ETA",
+                        "value_4": eta,
+                    },
+                )
+                live_status.info(
+                    f"{prefix}Discovering Gmail IDs. "
+                    f"Found {processed} unique ids in {int(elapsed)}s. "
+                    f"Estimated discovery time remaining: {eta}."
+                )
+            else:
+                processed = cumulative["messages_fetched"]
+                total_target = max(coverage_totals["missing_messages"], processed, 1)
+                stage_banner.success("Step 2 of 2: Fetching email content")
+                if processed >= 25 and elapsed > 0:
+                    rate = processed / elapsed
+                    remaining = max(total_target - processed, 0)
+                    eta = _format_eta(remaining / rate) if rate > 0 else "estimating..."
+                else:
+                    eta = "calculating..."
+                _render_stage_metrics(
+                    live_metrics,
+                    {
+                        "label_1": "Messages fetched",
+                        "value_1": processed,
+                        "label_2": "New message rows",
+                        "value_2": cumulative["new_message_rows"],
+                        "label_3": "Existing rows enriched",
+                        "value_3": cumulative["body_filled"],
+                        "label_4": "Fetch ETA",
+                        "value_4": eta,
+                    },
+                )
+                live_status.info(
+                    f"{prefix}Fetching email content. "
+                    f"Fetched {processed} messages in {int(elapsed)}s. "
+                    f"Fetch ETA: {eta}. "
+                    f"Already complete rows so far: {cumulative['already_complete']}."
+                )
             if live_rows:
+                live_table.markdown("**Current run progress**")
                 live_table.dataframe(pd.DataFrame(live_rows), use_container_width=True, hide_index=True)
 
         def on_index_progress(payload):
-            cumulative["indexed_seen"] = payload.get("unique_ids_discovered", cumulative["indexed_seen"])
-            cumulative["new_rows"] = payload.get("inserted", cumulative["new_rows"])
-            cumulative["already_present"] = payload.get("already_in_supabase", cumulative["already_present"])
-            cumulative["attempted_upserts"] = payload.get("attempted_upserts", cumulative["attempted_upserts"])
-            overall_progress.progress(min(cumulative["indexed_seen"] / max(coverage_totals["indexed_ids"], 1), 0.25))
-            render_live_progress("Discovering message ids")
+            cumulative["ids_discovered"] = payload.get("unique_ids_discovered", cumulative["ids_discovered"])
+            cumulative["new_index_rows"] = payload.get("inserted", cumulative["new_index_rows"])
+            cumulative["existing_index_rows"] = payload.get("already_in_supabase", cumulative["existing_index_rows"])
+            overall_progress.progress(min(cumulative["ids_discovered"] / max(coverage_totals["indexed_ids"], 1), 0.25))
+            render_live_progress("discovery")
 
         try:
             with st.spinner("Discovering Gmail messages for the selected date range...", show_time=True):
@@ -246,7 +298,6 @@ def show_gmail_fetch_control():
 
         total_attempted = 0
         total_inserted = 0
-        total_existing = 0
         total_body_filled = 0
         total_already_complete = 0
         total_indexed = 0
@@ -255,30 +306,29 @@ def show_gmail_fetch_control():
             current_row = {
                 "date": ymd,
                 "indexed_ids": 0,
-                "processed_messages": 0,
-                "attempted_upserts": 0,
-                "new_rows": 0,
-                "body_filled": 0,
+                "messages_fetched": 0,
+                "new_message_rows": 0,
+                "existing_rows_enriched": 0,
                 "already_complete": 0,
+                "status": "Waiting",
             }
             day_rows.append(current_row)
             live_rows[:] = day_rows
 
             def on_fetch_progress(payload, row=current_row):
                 row["indexed_ids"] = payload.get("indexed_for_day", row["indexed_ids"])
-                row["processed_messages"] = payload.get("processed_messages", row["processed_messages"])
-                row["attempted_upserts"] = payload.get("attempted_upserts", row["attempted_upserts"])
-                row["new_rows"] = payload.get("inserted", row["new_rows"])
-                row["body_filled"] = payload.get("body_filled", row["body_filled"])
+                row["messages_fetched"] = payload.get("processed_messages", row["messages_fetched"])
+                row["new_message_rows"] = payload.get("inserted", row["new_message_rows"])
+                row["existing_rows_enriched"] = payload.get("body_filled", row["existing_rows_enriched"])
                 row["already_complete"] = payload.get("already_complete", row["already_complete"])
-                cumulative["processed_messages"] = total_indexed + row["processed_messages"]
-                cumulative["new_rows"] = total_inserted + row["new_rows"]
-                cumulative["body_filled"] = total_body_filled + row["body_filled"]
+                row["status"] = "Fetching"
+                cumulative["messages_fetched"] = total_indexed + row["messages_fetched"]
+                cumulative["new_message_rows"] = total_inserted + row["new_message_rows"]
+                cumulative["body_filled"] = total_body_filled + row["existing_rows_enriched"]
                 cumulative["already_complete"] = total_already_complete + row["already_complete"]
-                cumulative["attempted_upserts"] = total_attempted + row["attempted_upserts"]
-                progress_fraction = (idx - 1 + (row["processed_messages"] / max(row["indexed_ids"], 1))) / max(total_days, 1)
+                progress_fraction = (idx - 1 + (row["messages_fetched"] / max(row["indexed_ids"], 1))) / max(total_days, 1)
                 overall_progress.progress(max(0.25, min(progress_fraction, 1.0)))
-                render_live_progress("Fetching message content", current_day=ymd)
+                render_live_progress("fetch", current_day=ymd)
 
             try:
                 with st.spinner(f"For {ymd}", show_time=True):
@@ -299,26 +349,24 @@ def show_gmail_fetch_control():
             total_indexed += fetch_stats["indexed_for_day"]
             total_attempted += fetch_stats["attempted_upserts"]
             total_inserted += fetch_stats["inserted"]
-            total_existing += fetch_stats["already_in_supabase"]
             total_body_filled += fetch_stats["body_filled"]
             total_already_complete += fetch_stats["already_complete"]
             current_row.update(
                 {
                     "indexed_ids": fetch_stats["indexed_for_day"],
-                    "processed_messages": fetch_stats["processed_messages"],
-                    "attempted_upserts": fetch_stats["attempted_upserts"],
-                    "new_rows": fetch_stats["inserted"],
-                    "body_filled": fetch_stats["body_filled"],
+                    "messages_fetched": fetch_stats["processed_messages"],
+                    "new_message_rows": fetch_stats["inserted"],
+                    "existing_rows_enriched": fetch_stats["body_filled"],
                     "already_complete": fetch_stats["already_complete"],
+                    "status": "Done",
                 }
             )
-            cumulative["processed_messages"] = total_indexed
-            cumulative["new_rows"] = total_inserted
+            cumulative["messages_fetched"] = total_indexed
+            cumulative["new_message_rows"] = total_inserted
             cumulative["body_filled"] = total_body_filled
             cumulative["already_complete"] = total_already_complete
-            cumulative["attempted_upserts"] = total_attempted
             overall_progress.progress(idx / max(total_days, 1))
-            render_live_progress("Finished day", current_day=ymd, force=True)
+            render_live_progress("fetch", current_day=ymd, force=True)
         live_status.success(f"Finished fetching indexed Gmail messages for {total_days} day(s).")
         st.success(
             f"Processed {total_indexed} indexed ids across {total_days} day(s): "
