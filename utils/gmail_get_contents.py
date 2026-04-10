@@ -18,7 +18,7 @@ def _insert_messages_batch(supabase, rows: List[Dict[str, Any]]):
         "existing": existing_count,
     }
 
-def fetch_and_store_messages_for_day(supabase, service, ymd: str, fetch_bodies: bool = True):
+def fetch_and_store_messages_for_day(supabase, service, ymd: str, fetch_bodies: bool = True, progress_callback=None):
     """
     ymd: 'YYYY-MM-DD' (UTC)
     Fetch IDs from gmail_message_index for that date, hydrate with Gmail API, and upsert into gmail_messages.
@@ -32,6 +32,7 @@ def fetch_and_store_messages_for_day(supabase, service, ymd: str, fetch_bodies: 
         "attempted_upserts": 0,
         "inserted": 0,
         "already_in_supabase": 0,
+        "processed_messages": 0,
     }
     for row in ids:
         mid = row["id"]
@@ -84,15 +85,52 @@ def fetch_and_store_messages_for_day(supabase, service, ymd: str, fetch_bodies: 
             payload["body_full"] = body_text
 
         batch.append(payload)
+        stats["processed_messages"] += 1
+        if progress_callback:
+            progress_callback(
+                {
+                    "ymd": ymd,
+                    "stage": "fetch_message",
+                    "indexed_for_day": stats["indexed_for_day"],
+                    "processed_messages": stats["processed_messages"],
+                    "attempted_upserts": stats["attempted_upserts"],
+                    "inserted": stats["inserted"],
+                    "already_in_supabase": stats["already_in_supabase"],
+                }
+            )
         if len(batch) >= 100:
             batch_stats = _insert_messages_batch(supabase,batch)
             stats["attempted_upserts"] += batch_stats["attempted"]
             stats["inserted"] += batch_stats["inserted"]
             stats["already_in_supabase"] += batch_stats["existing"]
+            if progress_callback:
+                progress_callback(
+                    {
+                        "ymd": ymd,
+                        "stage": "fetch_batch",
+                        "indexed_for_day": stats["indexed_for_day"],
+                        "processed_messages": stats["processed_messages"],
+                        "attempted_upserts": stats["attempted_upserts"],
+                        "inserted": stats["inserted"],
+                        "already_in_supabase": stats["already_in_supabase"],
+                    }
+                )
             batch.clear()
 
     batch_stats = _insert_messages_batch(supabase,batch)
     stats["attempted_upserts"] += batch_stats["attempted"]
     stats["inserted"] += batch_stats["inserted"]
     stats["already_in_supabase"] += batch_stats["existing"]
+    if progress_callback:
+        progress_callback(
+            {
+                "ymd": ymd,
+                "stage": "fetch_batch",
+                "indexed_for_day": stats["indexed_for_day"],
+                "processed_messages": stats["processed_messages"],
+                "attempted_upserts": stats["attempted_upserts"],
+                "inserted": stats["inserted"],
+                "already_in_supabase": stats["already_in_supabase"],
+            }
+        )
     return stats
