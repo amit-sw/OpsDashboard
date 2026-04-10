@@ -3,6 +3,7 @@ import os
 from datetime import date, datetime, timedelta, timezone
 import time
 from typing import Iterable, Tuple, List, Dict, Any, Optional
+from googleapiclient.errors import HttpError
 
 
 
@@ -32,6 +33,7 @@ def _list_ids(service, q: str, cap: int = 1000, include_spam_trash: bool = False
     while True:
         req = (service.users().messages()
                .list(userId="me", q=q, maxResults=min(100, cap - fetched),
+                     pageToken=token,
                      includeSpamTrash=include_spam_trash))
         resp = req.execute()
         msgs = resp.get("messages", [])
@@ -82,6 +84,7 @@ def backfill_index_for_date_range(
     seen: set[str] = set()             # in-memory dedupe across windows (idempotent if rerun)
     stats = {
         "gmail_ids_found": 0,
+        "unique_ids_discovered": 0,
         "duplicates_in_scan": 0,
         "attempted_upserts": 0,
         "inserted": 0,
@@ -97,6 +100,7 @@ def backfill_index_for_date_range(
                     "stage": "scan_window",
                     "window_query": q,
                     "gmail_ids_found": stats["gmail_ids_found"],
+                    "unique_ids_discovered": stats["unique_ids_discovered"],
                     "duplicates_in_scan": stats["duplicates_in_scan"],
                     "attempted_upserts": stats["attempted_upserts"],
                     "inserted": stats["inserted"],
@@ -112,6 +116,7 @@ def backfill_index_for_date_range(
                 stats["duplicates_in_scan"] += 1
                 continue
             seen.add(mid)
+            stats["unique_ids_discovered"] += 1
             meta = _get_meta(service, mid)
             internal_ms = int(meta.get("internalDate", 0))
             ymd = _ymd_from_ms(internal_ms)
@@ -133,6 +138,7 @@ def backfill_index_for_date_range(
                             "stage": "index_batch",
                             "batch_attempted": batch_stats["attempted"],
                             "gmail_ids_found": stats["gmail_ids_found"],
+                            "unique_ids_discovered": stats["unique_ids_discovered"],
                             "duplicates_in_scan": stats["duplicates_in_scan"],
                             "attempted_upserts": stats["attempted_upserts"],
                             "inserted": stats["inserted"],
@@ -151,6 +157,7 @@ def backfill_index_for_date_range(
                     "stage": "index_batch",
                     "batch_attempted": batch_stats["attempted"],
                     "gmail_ids_found": stats["gmail_ids_found"],
+                    "unique_ids_discovered": stats["unique_ids_discovered"],
                     "duplicates_in_scan": stats["duplicates_in_scan"],
                     "attempted_upserts": stats["attempted_upserts"],
                     "inserted": stats["inserted"],
