@@ -115,8 +115,8 @@ def show_ui_superadmin(user):
     #st.write("This is the admin panel. More features coming soon!")
     pages = {
         "SuperAdmin": [
-            st.Page(show_gmail_creds_page, title="GMail Creds"),
-            st.Page(show_gmail_fetch_control, title="GMail Fetch"),
+            st.Page(show_gmail_creds_page, title="Gmail Creds"),
+            st.Page(show_gmail_fetch_control, title="Gmail Fetch"),
         ],
         "Super-Calendar": [
             st.Page(show_student_email_calendar, title="Calendar"),
@@ -163,7 +163,7 @@ def show_ui_financeadmin(user):
             st.Page(show_students_page, title="Students"),
             st.Page(show_student_email_calendar, title="Calendar"),
             #st.Page(show_instructors_page, title="Instructors"),
-            st.Page(show_gmail_fetch_control, title="GMail Fetch"),
+            st.Page(show_gmail_fetch_control, title="Gmail Fetch"),
             
         ],
         "Finance-Data": [
@@ -200,7 +200,7 @@ def show_ui_admin(user):
         "Admin-Search": [
             st.Page(show_search_page, title="Email search"),
             #st.Page(show_instructors_page, title="Instructors"),
-            st.Page(show_gmail_fetch_control, title="GMail Fetch"),
+            st.Page(show_gmail_fetch_control, title="Gmail Fetch"),
         ],
         "Past Sessions": [
             st.Page(show_zoom_session_page, title="Sessions"),
