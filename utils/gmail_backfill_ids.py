@@ -1,6 +1,6 @@
 import os
 
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 import time
 from typing import Iterable, Tuple, List, Dict, Any, Optional
 
@@ -62,12 +62,17 @@ def _upsert_index_batch(rows: List[Dict[str, Any]]):
         return
     supabase.insert_gmail_index_records(rows)
 
-# ---- STEP 1: backfill index for last 6 months ----
-def backfill_index_last_six_months(service, window_days: int = 4, include_spam_trash: bool = False):
-    now = datetime.now(timezone.utc)
-    start = now - timedelta(days=182)  # ~6 months
+def backfill_index_for_date_range(
+    service,
+    start_date: date,
+    end_date: date,
+    window_days: int = 4,
+    include_spam_trash: bool = False,
+):
+    start = datetime.combine(start_date, datetime.min.time(), tzinfo=timezone.utc)
+    end = datetime.combine(end_date + timedelta(days=1), datetime.min.time(), tzinfo=timezone.utc)
     seen: set[str] = set()             # in-memory dedupe across windows (idempotent if rerun)
-    for after_ts, before_ts in _windows(start, now, window_days):
+    for after_ts, before_ts in _windows(start, end, window_days):
         q = f"after:{after_ts} before:{before_ts}"   # whole mailbox (Inbox+Sent; Spam/Trash excluded unless flag)
         ids = list(_list_ids(service, q, cap=1000, include_spam_trash=include_spam_trash))
         if not ids:
@@ -93,3 +98,15 @@ def backfill_index_last_six_months(service, window_days: int = 4, include_spam_t
                 batch.clear()
 
         _upsert_index_batch(batch)  # flush remainder
+
+# ---- STEP 1: backfill index for last 6 months ----
+def backfill_index_last_six_months(service, window_days: int = 4, include_spam_trash: bool = False):
+    now = datetime.now(timezone.utc)
+    start = now - timedelta(days=182)  # ~6 months
+    backfill_index_for_date_range(
+        service,
+        start.date(),
+        now.date(),
+        window_days=window_days,
+        include_spam_trash=include_spam_trash,
+    )
