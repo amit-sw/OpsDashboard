@@ -28,7 +28,18 @@ def _windows(start_utc: datetime, end_utc: datetime, window_days: int = 4) -> It
         yield after, before
         after = before - 1  # 1s overlap to avoid gaps
 
-def _list_ids(service, q: str, cap: int = 1000, include_spam_trash: bool = False) -> Iterable[str]:
+def _bucket_internal_ms(bucket_day: date) -> int:
+    """Return a stable synthetic timestamp for the discovery day bucket.
+
+    Discovery intentionally stores a lightweight index only. We avoid
+    `messages.get(..., format="metadata")` per message because it makes the
+    index step much slower and more expensive. The exact payload and exact
+    Gmail `internalDate` are fetched later during hydration.
+    """
+    return int(datetime.combine(bucket_day, datetime.min.time(), tzinfo=timezone.utc).timestamp() * 1000)
+
+
+def _list_ids(service, q: str, cap: int = 1000, include_spam_trash: bool = False) -> Iterable[Dict[str, Any]]:
     token, fetched = None, 0
     while True:
         req = (service.users().messages()
@@ -40,23 +51,17 @@ def _list_ids(service, q: str, cap: int = 1000, include_spam_trash: bool = False
         if not msgs:
             break
         for m in msgs:
-            yield m["id"]
+            msg_id = m.get("id")
+            if not msg_id:
+                continue
+            yield {
+                "id": msg_id,
+                "thread_id": m.get("threadId"),
+            }
         fetched += len(msgs)
         token = resp.get("nextPageToken")
         if not token or fetched >= cap:
             break
-
-def _get_meta(service, msg_id: str) -> Dict[str, Any]:
-    # metadata format is fast and includes internalDate
-    return (service.users()
-            .messages()
-            .get(userId="me", id=msg_id, format="metadata",
-                 metadataHeaders=["From", "Subject", "Date"])
-            .execute())
-
-def _ymd_from_ms(internal_ms: int) -> str:
-    dt = datetime.fromtimestamp(internal_ms / 1000, tz=timezone.utc)
-    return dt.strftime("%Y-%m-%d")
 
 def _upsert_index_batch(rows: List[Dict[str, Any]]):
     # rows: [{id, thread_id, internal_ms, ymd}]
@@ -79,6 +84,15 @@ def backfill_index_for_date_range(
     include_spam_trash: bool = False,
     progress_callback=None,
 ):
+    """Discover Gmail ids for a date range and store a lightweight index only.
+
+    Chosen tradeoff:
+    Discovery stores only `id`, `thread_id` when available from Gmail list
+    results, and the scanned `ymd` bucket. We also persist a synthetic
+    `internal_ms` anchored to that bucket so the existing schema and ordering
+    still work. Exact Gmail metadata and full message content are intentionally
+    deferred to the fetch/hydration step.
+    """
     start = datetime.combine(start_date, datetime.min.time(), tzinfo=timezone.utc)
     end = datetime.combine(end_date + timedelta(days=1), datetime.min.time(), tzinfo=timezone.utc)
     seen: set[str] = set()             # in-memory dedupe across windows (idempotent if rerun)
@@ -91,6 +105,7 @@ def backfill_index_for_date_range(
         "already_in_supabase": 0,
     }
     for after_ts, before_ts in _windows(start, end, window_days):
+        bucket_day = datetime.fromtimestamp(after_ts, tz=timezone.utc).date()
         q = f"after:{after_ts} before:{before_ts}"   # whole mailbox (Inbox+Sent; Spam/Trash excluded unless flag)
         ids = list(_list_ids(service, q, cap=1000, include_spam_trash=include_spam_trash))
         stats["gmail_ids_found"] += len(ids)
@@ -111,20 +126,18 @@ def backfill_index_for_date_range(
             continue
 
         batch: List[Dict[str, Any]] = []
-        for mid in ids:
+        for message_ref in ids:
+            mid = message_ref["id"]
             if mid in seen:
                 stats["duplicates_in_scan"] += 1
                 continue
             seen.add(mid)
             stats["unique_ids_discovered"] += 1
-            meta = _get_meta(service, mid)
-            internal_ms = int(meta.get("internalDate", 0))
-            ymd = _ymd_from_ms(internal_ms)
             batch.append({
                 "id": mid,
-                "thread_id": meta.get("threadId"),
-                "internal_ms": internal_ms,
-                "ymd": ymd
+                "thread_id": message_ref.get("thread_id"),
+                "internal_ms": _bucket_internal_ms(bucket_day),
+                "ymd": bucket_day.isoformat(),
             })
             # flush periodically to keep memory small
             if len(batch) >= 200:
