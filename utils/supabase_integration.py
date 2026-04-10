@@ -419,6 +419,28 @@ class SupabaseClient:
             print(f"Error fetching existing gmail message ids: {e}")
         return found
 
+    def get_existing_gmail_message_records(self, ids):
+        if not self.supabase or not ids:
+            return {}
+        found = {}
+        try:
+            for start in range(0, len(ids), 500):
+                chunk = ids[start:start + 500]
+                response = (
+                    self.supabase
+                    .table("gmail_messages")
+                    .select("id, body_full")
+                    .in_("id", chunk)
+                    .execute()
+                )
+                for row in response.data or []:
+                    msg_id = row.get("id")
+                    if msg_id:
+                        found[msg_id] = row
+        except Exception as e:
+            print(f"Error fetching existing gmail message records: {e}")
+        return found
+
     def list_gmail_index_rows_by_range(self, start_ymd: str, end_ymd: str):
         if not self.supabase:
             return []
