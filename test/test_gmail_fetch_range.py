@@ -1,4 +1,5 @@
 from datetime import date
+from datetime import datetime, timezone
 
 from src.show_gmail_fetch_control import _iter_ymd_range
 from utils import gmail_backfill_ids
@@ -113,3 +114,12 @@ def test_list_ids_uses_page_token():
         {"id": "msg-2", "thread_id": "thread-2"},
     ]
     assert captured["tokens"] == [None, "page-2"]
+
+
+def test_windows_terminates_when_range_is_shorter_than_span():
+    start = datetime(2026, 4, 9, tzinfo=timezone.utc)
+    end = datetime(2026, 4, 11, tzinfo=timezone.utc)
+
+    windows = list(gmail_backfill_ids._windows(start, end, window_days=4))
+
+    assert windows == [(1775692800, 1775865600)]
