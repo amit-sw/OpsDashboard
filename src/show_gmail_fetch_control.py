@@ -284,7 +284,7 @@ def show_gmail_fetch_control():
             live_status.error(
                 "Gmail returned an API error while discovering message ids. "
                 "Please retry with a smaller date range. "
-                f"Partial progress before failure: discovered {cumulative['indexed_seen']} unique ids."
+                f"Partial progress before failure: discovered {cumulative['ids_discovered']} unique ids."
             )
             st.exception(exc)
             return
@@ -342,7 +342,7 @@ def show_gmail_fetch_control():
             except HttpError as exc:
                 live_status.error(
                     f"Gmail returned an API error while fetching message content for {ymd}. "
-                    f"Completed {total_indexed + current_row['processed_messages']} messages before failure."
+                    f"Completed {total_indexed + current_row['messages_fetched']} messages before failure."
                 )
                 st.exception(exc)
                 return

@@ -26,6 +26,8 @@ def _windows(start_utc: datetime, end_utc: datetime, window_days: int = 4) -> It
     while after < end:
         before = min(end, after + span)
         yield after, before
+        if before >= end:
+            break
         after = before - 1  # 1s overlap to avoid gaps
 
 def _bucket_internal_ms(bucket_day: date) -> int:
