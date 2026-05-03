@@ -24,6 +24,7 @@ from src.show_table_explorer import show_table_explorer
 from src.show_sheet_explorer import show_sheet_explorer
 from src.show_question_prompts import show_question_prompts_page
 from src.show_qna_emails import show_qna_emails_page
+from src.show_recent_sessions_page import show_recent_sessions_page
 
 from utils.process_gsheets import get_users_students
 
@@ -127,6 +128,9 @@ def show_ui_superadmin(user):
         "Super - Past Sessions": [
             st.Page(show_zoom_session_page, title="Sessions"),
             st.Page(show_zoom_detail_page, title="Session Details"),
+        ],
+        "Super-Recent Sessions": [
+            st.Page(show_recent_sessions_page, title="New Sessions (24h)"),
         ],
         "Data": [
             st.Page(show_table_explorer, title="Table Explorer"),
