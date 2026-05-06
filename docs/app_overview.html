@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OpsDashboard App Overview</title>
+  <style>
+    :root{--ink:#171a21;--muted:#5c6675;--paper:#fbfbf8;--surface:#fff;--line:#dfe3ea;--accent:#0f766e;--accent-strong:#115e59;--signal:#b7791f;--night:#20242d;--night-2:#2d3340;--radius:8px;--shadow:0 20px 60px rgba(23,26,33,.12)}
+    *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--paper);color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;line-height:1.55}.progress{position:fixed;inset:0 auto auto 0;width:0;height:4px;background:var(--accent);z-index:20}
+    header{min-height:82svh;display:grid;align-items:center;background:var(--night);color:#f9fafb;border-bottom:1px solid #111827}.hero{width:min(1180px,calc(100% - 40px));margin:0 auto;display:grid;grid-template-columns:minmax(0,1fr) minmax(360px,.82fr);gap:54px;align-items:center;padding:64px 0 42px}.eyebrow{color:#8dd9cf;font-size:.78rem;font-weight:760;text-transform:uppercase;letter-spacing:0}
+    h1,h2,h3{line-height:1.08;letter-spacing:0;margin:0}h1{font-size:clamp(3.2rem,8vw,7.5rem);max-width:9ch}h2{font-size:clamp(2rem,4.8vw,4rem)}h3{font-size:1.05rem;margin-bottom:.55rem}p{margin:0}.hero p{max-width:660px;color:#d7dde8;font-size:clamp(1.05rem,2vw,1.28rem);margin-top:24px}.hero-actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:34px}
+    a.button,button{appearance:none;border:1px solid transparent;border-radius:var(--radius);cursor:pointer;font:inherit;font-weight:720;min-height:42px;padding:10px 15px;text-decoration:none;transition:transform .16s ease,background .16s ease,border-color .16s ease}a.button.primary{background:#f8fafc;color:var(--night)}a.button.secondary,.role-filter button{background:transparent;color:inherit;border-color:rgba(255,255,255,.26)}button:hover,a.button:hover{transform:translateY(-1px)}
+    .flow{background:var(--night-2);border:1px solid rgba(255,255,255,.12);border-radius:var(--radius);padding:22px;box-shadow:var(--shadow)}.flow-title{color:#dce8e6;font-size:.85rem;font-weight:760;margin-bottom:16px}.flow-grid{display:grid;gap:10px}.flow-node{display:grid;grid-template-columns:120px 1fr;gap:12px;align-items:center;padding:12px;border:1px solid rgba(255,255,255,.12);border-radius:6px;background:rgba(255,255,255,.04)}.flow-node b{color:#fff}.flow-node span{color:#bac4d1;font-size:.92rem}
+    nav{position:sticky;top:0;z-index:10;background:rgba(251,251,248,.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}nav .inner{width:min(1180px,calc(100% - 40px));margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:18px;min-height:64px}.brand{font-weight:840}.links{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}.links a{color:var(--muted);border-radius:999px;padding:7px 10px;text-decoration:none;font-size:.92rem;font-weight:700}.links a.active{color:var(--accent-strong);background:#dff3ef}
+    main,footer{width:min(1180px,calc(100% - 40px));margin:0 auto}section{padding:88px 0;border-bottom:1px solid var(--line)}.section-head{display:grid;grid-template-columns:.65fr 1fr;gap:44px;align-items:start;margin-bottom:40px}.lead{color:var(--muted);font-size:1.08rem;max-width:720px}.metrics,.decision-list,.future-list{display:grid;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}.metrics{grid-template-columns:repeat(4,1fr)}.decision-list,.future-list{grid-template-columns:repeat(2,minmax(0,1fr))}.metric,.decision,.future-item{background:var(--surface);padding:22px}.metric{min-height:124px}.metric strong{display:block;font-size:2rem;line-height:1}.metric span,.decision p,.future-item p,.capability p,.step p{color:var(--muted)}
+    .capabilities{display:grid;grid-template-columns:260px 1fr;gap:28px;align-items:start}.role-filter{position:sticky;top:84px;display:grid;gap:8px;padding:12px;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface)}.role-filter button{color:var(--ink);border-color:var(--line);text-align:left}.role-filter button.active{background:var(--accent);border-color:var(--accent);color:#fff}.capability-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.capability{min-height:158px;background:var(--surface);border:1px solid var(--line);border-left:5px solid var(--accent);border-radius:var(--radius);padding:20px;transition:opacity .18s ease,transform .18s ease}.capability.is-hidden{display:none}.capability small{display:block;color:var(--signal);font-weight:780;margin-bottom:8px;text-transform:uppercase}
+    .timeline{display:grid;border-top:1px solid var(--line)}.step{display:grid;grid-template-columns:190px 1fr;gap:24px;padding:24px 0;border-bottom:1px solid var(--line)}.step b{color:var(--accent-strong)}.callout{display:flex;justify-content:space-between;align-items:center;gap:20px;background:var(--night);color:#f8fafc;border-radius:var(--radius);padding:34px}.callout p{color:#cbd5e1;margin-top:8px}.callout button{background:#f8fafc;color:var(--night)}.reveal{opacity:0;transform:translateY(12px);transition:opacity .42s ease,transform .42s ease}.reveal.visible{opacity:1;transform:none}footer{padding:28px 0 48px;color:var(--muted);font-size:.92rem}
+    @media (max-width:900px){header{min-height:auto}.hero,.section-head,.capabilities,.step{grid-template-columns:1fr}.hero{gap:30px;padding-top:44px}.metrics,.decision-list,.future-list,.capability-grid{grid-template-columns:1fr}.role-filter{position:static}nav .inner{align-items:flex-start;flex-direction:column;padding:12px 0}}
+  </style>
+</head>
+<body>
+  <div class="progress" aria-hidden="true"></div>
+  <header id="top">
+    <div class="hero">
+      <div>
+        <div class="eyebrow">AI Club internal operations</div>
+        <h1>OpsDashboard</h1>
+        <p>A Streamlit workspace that gives staff one governed place to inspect students, sessions, communications, finance records, and automation output without handing everyone raw admin-tool access.</p>
+        <div class="hero-actions">
+          <a class="button primary" href="#purpose">Read Overview</a>
+          <a class="button secondary" href="#current">Explore Current State</a>
+        </div>
+      </div>
+      <div class="flow reveal" aria-label="High level app data flow">
+        <div class="flow-title">Runtime shape</div>
+        <div class="flow-grid">
+          <div class="flow-node"><b>Google login</b><span>Verified identity enters through Streamlit auth.</span></div>
+          <div class="flow-node"><b>Supabase role</b><span>`authorized_users` decides the navigation surface.</span></div>
+          <div class="flow-node"><b>Pages</b><span>Streamlit modules expose students, Gmail, Calendar, Zoom, data, and finance views.</span></div>
+          <div class="flow-node"><b>Jobs</b><span>`cron_app.py` imports sessions, runs QnA, syncs finance, and counts tokens.</span></div>
+        </div>
+      </div>
+    </div>
+  </header>
+  <nav aria-label="Page sections">
+    <div class="inner">
+      <div class="brand">OpsDashboard Overview</div>
+      <div class="links">
+        <a href="#purpose">Purpose</a><a href="#decisions">Decisions</a><a href="#current">Current State</a><a href="#future">Future</a>
+      </div>
+    </div>
+  </nav>
+  <main>
+    <section id="purpose" class="reveal">
+      <div class="section-head">
+        <h2>Purpose</h2>
+        <p class="lead">OpsDashboard centralizes the operational context AI Club staff need to support students and manage programs: roster data, relationships, Gmail messages, Google Calendar events, Zoom transcripts, QnA summaries, Braintree transactions, and database inspection.</p>
+      </div>
+      <div class="metrics">
+        <div class="metric"><strong>1</strong><span>role-gated Streamlit app for daily operations</span></div>
+        <div class="metric"><strong>5</strong><span>supported roles: guest, user, admin, financeadmin, superadmin</span></div>
+        <div class="metric"><strong>7+</strong><span>integrations across Supabase, Google APIs, AWS, LLMs, Braintree, and AgentMail</span></div>
+        <div class="metric"><strong>2</strong><span>execution modes: interactive pages and batch processing</span></div>
+      </div>
+    </section>
+    <section id="decisions" class="reveal">
+      <div class="section-head">
+        <h2>Key Design Decisions</h2>
+        <p class="lead">The app favors a small operational shell with explicit integration boundaries, role-aware navigation, and batch jobs that can be run separately from the UI.</p>
+      </div>
+      <div class="decision-list">
+        <article class="decision"><h3>Streamlit as the staff console</h3><p>`app.py` handles login and hands users to `src/verified_ui.py`, where role-specific page groups are assembled with Streamlit navigation.</p></article>
+        <article class="decision"><h3>Supabase as the control plane</h3><p>Supabase stores authorized users, application tables, Gmail tokens, Gmail message data, Zoom sessions, QnA prompts, recipients, and finance artifacts.</p></article>
+        <article class="decision"><h3>Role-first access</h3><p>Guest users see an access message, while admin, finance, and superadmin roles unlock progressively broader tools.</p></article>
+        <article class="decision"><h3>Integration clients stay in `utils/`</h3><p>Gmail, Calendar, Sheets, AWS, Braintree, AgentMail, Supabase, and LLM calls sit behind focused helper modules.</p></article>
+        <article class="decision"><h3>Gmail sync is split in two</h3><p>Discovery stores lightweight message IDs first. Hydration later fetches exact metadata and full content.</p></article>
+        <article class="decision"><h3>Batch work is outside the UI path</h3><p>`cron_app.py` runs session import, transcript QnA, Braintree sync, finance mail processing, and token counting.</p></article>
+      </div>
+    </section>
+    <section id="current" class="reveal">
+      <div class="section-head">
+        <h2>Current State</h2>
+        <p class="lead">Use the role filter to see what different users can do today. The same app supports student operations, data exploration, communications search, transcript review, finance workflows, and administrator setup.</p>
+      </div>
+      <div class="capabilities">
+        <div class="role-filter" aria-label="Filter capabilities by role">
+          <button class="active" data-role="all">All capabilities</button><button data-role="user">User</button><button data-role="admin">Admin</button><button data-role="financeadmin">Finance Admin</button><button data-role="superadmin">Super Admin</button>
+        </div>
+        <div class="capability-grid">
+          <article class="capability" data-roles="user admin financeadmin"><small>User</small><h3>Assigned student context</h3><p>Users can view related students, student details, calendar context, and session history derived from Sheets and Supabase records.</p></article>
+          <article class="capability" data-roles="user admin financeadmin superadmin"><small>All authorized roles</small><h3>Email search and sessions</h3><p>Authorized staff can search Gmail, browse stored Zoom sessions, open details, and use LLM-backed summaries where configured.</p></article>
+          <article class="capability" data-roles="user admin financeadmin superadmin"><small>All authorized roles</small><h3>Data and prompt visibility</h3><p>Table Explorer, Sheet Explorer, and Question Prompts expose known data sources and prompt templates without direct database access.</p></article>
+          <article class="capability" data-roles="admin financeadmin superadmin"><small>Admin</small><h3>Gmail fetch controls</h3><p>Admin-oriented pages sync Gmail by date range, inspect stored messages, and show progress for database hydration.</p></article>
+          <article class="capability" data-roles="admin financeadmin"><small>Admin and Finance</small><h3>Cron exploration</h3><p>Admin and Finance Admin roles can inspect operational fetch tooling for batch-style Zoom and data workflows.</p></article>
+          <article class="capability" data-roles="financeadmin"><small>Finance Admin</small><h3>Finance workflows</h3><p>Finance Admins can use the Finance Agent, Braintree views, Gmail Fetch, QnA Emails, and broader session and data tools.</p></article>
+          <article class="capability" data-roles="superadmin"><small>Super Admin</small><h3>Credential and monitoring tools</h3><p>Super Admins can manage Gmail credentials, review new sessions from the last 24 hours, manage QnA recipients, and inspect data surfaces.</p></article>
+        </div>
+      </div>
+    </section>
+    <section class="reveal" aria-labelledby="flow-heading">
+      <div class="section-head">
+        <h2 id="flow-heading">How Work Moves</h2>
+        <p class="lead">The application is built around repeatable operational loops instead of one-off scripts. Interactive pages help staff inspect and trigger work; background jobs normalize and enrich data for later review.</p>
+      </div>
+      <div class="timeline">
+        <div class="step"><b>Login and routing</b><p>Streamlit authenticates with Google, Supabase resolves the email to a role, and `src/verified_ui.py` renders the allowed page groups.</p></div>
+        <div class="step"><b>Operational lookup</b><p>Sheets, Supabase, Gmail, Calendar, Zoom sessions, and finance records are presented through focused Streamlit pages.</p></div>
+        <div class="step"><b>Data capture</b><p>Gmail sync, AWS Zoom import, Braintree sync, and AgentMail processing store normalized records back into Supabase.</p></div>
+        <div class="step"><b>Generated output</b><p>LLM QnA responses, transcript token counts, finance summaries, and grouped recipient emails are saved or sent for follow-up.</p></div>
+      </div>
+    </section>
+    <section id="future" class="reveal">
+      <div class="section-head">
+        <h2>Future Extensions</h2>
+        <p class="lead">The next useful investments would make the dashboard more observable, more self-service, and safer as more people and data sources move through it.</p>
+      </div>
+      <div class="future-list">
+        <article class="future-item"><h3>Job observability</h3><p>Add a run history page with status, duration, row counts, retries, failure reasons, and links to affected records.</p></article>
+        <article class="future-item"><h3>Audit trail</h3><p>Record who changed prompts, recipients, credentials, and finance-facing settings.</p></article>
+        <article class="future-item"><h3>Data quality checks</h3><p>Validate required Sheet columns, duplicate students, stale relationships, missing transcripts, and Supabase view grants.</p></article>
+        <article class="future-item"><h3>Prompt lifecycle</h3><p>Add prompt versions, test runs, approval states, and sample outputs before prompts affect production summaries.</p></article>
+        <article class="future-item"><h3>Finance reconciliation</h3><p>Connect Braintree transactions, mailbox events, and student records into exception queues.</p></article>
+        <article class="future-item"><h3>Fine-grained access</h3><p>Move beyond page-level roles toward row-level policies and scoped views for sensitive tables and finance data.</p></article>
+      </div>
+    </section>
+    <section class="reveal">
+      <div class="callout">
+        <div>
+          <h2>Operational summary</h2>
+          <p id="summaryText">OpsDashboard is an internal Streamlit app that combines role-gated navigation, Supabase-backed data, Google and AWS integrations, LLM-assisted transcript workflows, finance processing, and batch jobs into one staff operations surface.</p>
+        </div>
+        <button id="copySummary" type="button">Copy Summary</button>
+      </div>
+    </section>
+  </main>
+  <footer>Self-contained documentation page. Generated from the repository docs and current app structure in May 2026.</footer>
+  <script>
+    const progress=document.querySelector(".progress"),navLinks=[...document.querySelectorAll("nav a")],sections=navLinks.map(link=>document.querySelector(link.getAttribute("href"))),reveals=[...document.querySelectorAll(".reveal")];
+    function updateProgress(){const max=document.documentElement.scrollHeight-window.innerHeight;progress.style.width=`${Math.max(0,Math.min(100,(window.scrollY/max)*100))}%`;const current=sections.filter(section=>section&&section.offsetTop-120<=window.scrollY).pop();navLinks.forEach(link=>link.classList.toggle("active",current&&link.getAttribute("href")===`#${current.id}`))}
+    const revealObserver=new IntersectionObserver(entries=>{entries.forEach(entry=>{if(entry.isIntersecting)entry.target.classList.add("visible")})},{threshold:.12});reveals.forEach(el=>revealObserver.observe(el));
+    document.querySelectorAll("[data-role]").forEach(button=>{button.addEventListener("click",()=>{const role=button.dataset.role;document.querySelectorAll("[data-role]").forEach(item=>item.classList.toggle("active",item===button));document.querySelectorAll(".capability").forEach(item=>{const visible=role==="all"||item.dataset.roles.split(" ").includes(role);item.classList.toggle("is-hidden",!visible)})})});
+    document.querySelector("#copySummary").addEventListener("click",async event=>{const text=document.querySelector("#summaryText").textContent.trim();try{await navigator.clipboard.writeText(text);event.currentTarget.textContent="Copied"}catch{event.currentTarget.textContent="Copy unavailable"}window.setTimeout(()=>event.currentTarget.textContent="Copy Summary",1500)});
+    window.addEventListener("scroll",updateProgress,{passive:true});updateProgress();
+  </script>
+</body>
+</html>
