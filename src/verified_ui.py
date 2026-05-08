@@ -35,9 +35,21 @@ def show_events_all():
 def set_student_list(user):
     #st.title("User's students")
     email = user.get('email')
-    service_account_info = st.secrets["gdrive_secrets"]
-    sheets_list=service_account_info.get("sheets")
-    df_students, df_topic_list, df_persons, df_relations, df_sessions=get_users_students(email, service_account_info, sheets_list)
+    service_account_info = st.secrets.get("gdrive_secrets", {})
+    sheets_list = service_account_info.get("sheets", [])
+    try:
+        df_students, df_topic_list, df_persons, df_relations, df_sessions = get_users_students(
+            email,
+            service_account_info,
+            sheets_list,
+        )
+    except Exception as exc:
+        st.warning(f"Student roster could not be loaded: {exc}")
+        df_students = pd.DataFrame()
+        df_topic_list = pd.DataFrame()
+        df_persons = pd.DataFrame()
+        df_relations = pd.DataFrame()
+        df_sessions = pd.DataFrame()
     #with st.sidebar.expander("Persons"):
     #    st.dataframe(df_persons)
     #with st.sidebar.expander("Relationships"):
