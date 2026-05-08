@@ -35,6 +35,13 @@ pytest
 The app reads `st.secrets` at startup. The common structure is:
 
 ```toml
+[auth]
+redirect_uri = "https://aiclubops.streamlit.app/~/+/oauth2callback"
+cookie_secret = "generate-a-long-random-secret-and-keep-it-stable"
+client_id = "..."
+client_secret = "..."
+server_metadata_url = "https://accounts.google.com/.well-known/openid-configuration"
+
 [env]
 SUPABASE_URL = "..."
 SUPABASE_KEY = "..."
@@ -65,6 +72,12 @@ TOKEN_COUNT_ENCODING = "cl100k_base"
 [posthog]
 # Optional analytics configuration.
 ```
+
+For Streamlit Community Cloud, keep `auth.redirect_uri` exactly aligned with
+the deployed callback URL, including the `~/+/oauth2callback` path segment, and
+enter the same URL in the Google OAuth client's authorized redirect URIs. Keep
+`auth.cookie_secret` stable across redeploys; changing it invalidates in-flight
+login state and can surface as a callback `mismatching_state` error.
 
 Some older page helpers use `REGION`, `CLUSTER_ARN`, `SECRET_ARN`, and `DB_NAME` for AWS fetches. Keep those aliases populated if the CRON explorer page is used.
 
@@ -112,7 +125,8 @@ For hosted deployments, schedule `cron_app.py` in the platform scheduler or a se
 - Secrets configured in Streamlit or the hosting environment.
 - Supabase schema and public views applied.
 - Supabase API settings include the required schema/views.
-- Google login and Gmail OAuth redirect URLs match the deployed URL.
+- Google login uses `https://aiclubops.streamlit.app/~/+/oauth2callback` in both Streamlit Secrets and the Google OAuth client.
+- Gmail OAuth redirect URLs match the deployed URL configured for the Gmail helper.
 - Service-account sheets are shared with the configured Google service account.
 - AWS, Braintree, AgentMail, and OpenAI keys are present for enabled workflows.
 - A `superadmin` user exists for first operational access.
