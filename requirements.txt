@@ -1,9 +1,9 @@
 # Add project dependencies here
-streamlit
+streamlit[auth]==1.56.0
 dotenv
 pandas
 supabase
-Authlib
+Authlib==1.6.11
 
 boto3
 

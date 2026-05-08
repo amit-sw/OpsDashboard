@@ -25,6 +25,18 @@ The email is authenticated but not authorized.
 
 Check Supabase table `authorized_users` for the exact Google account email. Add or update the row with the correct role.
 
+## Login Callback Shows Mismatching State
+
+This happens inside Streamlit's OAuth callback before app code runs. Check:
+
+- `st.secrets["auth"]["redirect_uri"]` exactly matches the hosted callback URL.
+  For Streamlit Community Cloud, use `https://aiclubops.streamlit.app/~/+/oauth2callback`.
+- The Google OAuth client includes the same URL in Authorized redirect URIs.
+- `st.secrets["auth"]["cookie_secret"]` is long, random, and unchanged across deploys.
+- The user starts from a fresh app URL, not an old `oauth2callback` URL from browser history.
+
+After changing OAuth settings, clear the site's cookies or use a private browser window for the next login attempt.
+
 ## Supabase Credentials Are Missing
 
 Pages that use Supabase require `SUPABASE_URL` and `SUPABASE_KEY`. In Streamlit, put them under `[env]` in secrets so `app.py` can copy them into environment variables.
