@@ -25,7 +25,14 @@ def create_topic_zoom_session_table(supabase_client: SupabaseClient, topic_list:
 def show_users_students():
     st.title("User's Students - Initial")
     df = st.session_state.get('student_list')
-    df.drop(columns=["Status"], inplace=True)
+    if df is None or df.empty:
+        st.info("No students are currently linked to your account.")
+        return
+    if "Name" not in df.columns:
+        st.warning("Student roster is missing the Name column.")
+        return
+    df = df.copy()
+    df.drop(columns=["Status"], inplace=True, errors="ignore")
     df["URL"]="/show_users_student_details?q="+df['Name']
     st.dataframe(df, column_config={"URL": st.column_config.LinkColumn("URL", display_text="Student details")}, hide_index=True)
 
@@ -129,6 +136,12 @@ def show_users_student_details():
     student_name = st.query_params.get("q")
     st.title(f"Person: {student_name}")
     df=st.session_state.get('topic_list')
+    if df is None or df.empty:
+        st.info("No session topics are currently linked to this student.")
+        return
+    if "Person" not in df.columns or "Topic" not in df.columns:
+        st.warning("Session topic data is missing required columns.")
+        return
     df = df[df['Person'] == student_name]
     topics = df['Topic'].dropna().str.strip().tolist()
     with st.expander("Recent sessions"):

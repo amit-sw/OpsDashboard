@@ -93,7 +93,7 @@ def process_sheets(service_account_info, sheet_list):
     )
     sheets_service = build('sheets', 'v4', credentials=creds)
     results={}
-    for sheet in sheet_list:
+    for sheet in sheet_list or []:
         res=read_google_sheet(sheets_service, sheet)
         results |= res
     return results
@@ -116,28 +116,51 @@ def get_info_gsheets(service_account_info, sheets_list):
         df_sessions=pd.DataFrame(list_sessions[1:],columns=list_sessions[0])
     return df_persons, df_relations, df_sessions
 
+def _empty_user_student_result(df_persons=None, df_relations=None, df_sessions=None):
+    return (
+        pd.DataFrame(),
+        pd.DataFrame(),
+        df_persons if df_persons is not None else pd.DataFrame(),
+        df_relations if df_relations is not None else pd.DataFrame(),
+        df_sessions if df_sessions is not None else pd.DataFrame(),
+    )
+
+
 @st.cache_data(ttl=3600)
 def get_users_students(email, _service_account_info, sheets_list):
-
     service_account_info=_service_account_info
     df_persons,df_relations,df_sessions=get_info_gsheets(service_account_info, sheets_list)
 
-    person_names = set(df_persons.loc[df_persons['Email'].fillna('').str.strip().str.lower() == email,'Name'].astype(str))
+    required_columns = [
+        (df_persons, {"Email", "Name"}),
+        (df_relations, {"Person", "Student"}),
+        (df_sessions, {"Person"}),
+    ]
+    if any(not columns.issubset(set(df.columns)) for df, columns in required_columns):
+        return _empty_user_student_result(df_persons, df_relations, df_sessions)
+
+    email_key = str(email or "").strip().lower()
+    person_names = set(
+        df_persons.loc[
+            df_persons['Email'].fillna('').str.strip().str.lower() == email_key,
+            'Name',
+        ].astype(str)
+    )
 
     if not person_names:
         #st.info(f"Logged in user {email=} not found in Persons table")
-        return None, None, df_persons,df_relations, df_sessions
+        return _empty_user_student_result(df_persons, df_relations, df_sessions)
 
     related_rows = df_relations[df_relations['Person'].astype(str).isin(person_names)]
     student_names = set(related_rows['Student'].astype(str))
     if not student_names:
         #st.info(f"Logged in user {email=}, {person_names=} not found in relationship table")
-        return None, None, df_persons,df_relations, df_sessions
+        return _empty_user_student_result(df_persons, df_relations, df_sessions)
 
     filtered_df = df_persons[df_persons['Name'].astype(str).isin(student_names)]
     if filtered_df.empty:
         #st.info("No matching persons for related IDs.")
-        return None, None. df_persons,df_relations, df_sessions
+        return _empty_user_student_result(df_persons, df_relations, df_sessions)
     #st.success("Related persons")
     
     df_topic_list = df_sessions[df_sessions['Person'].astype(str).isin(student_names)]
